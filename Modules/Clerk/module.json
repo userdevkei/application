@@ -1,0 +1,13 @@
+{
+    "name": "Clerk",
+    "alias": "clerk",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Clerk\\Providers\\ClerkServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": []
+}
