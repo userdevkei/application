@@ -1,7 +1,7 @@
-@extends('clerk::layouts.default')
+@extends('admin::layouts.default')
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/2.1.5/css/dataTables.dataTables.css">
-@section('clerk::dashboard')
+@section('admin::dashboard')
     <div class="card">
         <div class="card-header">
             <div class="row flex-between-center">
@@ -49,7 +49,7 @@
                                         </div>
 
                                     </div>
-                                <form id="tciForm" method="post" action="{{ route('clerk.createLLI') }}">
+                                <form id="tciForm" method="post" action="{{ route('admin.createLLI') }}">
                                     @csrf
 
                                     <div class="mb-4" id="teasPane"></div>
@@ -164,7 +164,7 @@
             var warehouseId = $('#warehouse').val();
             $.ajax({
                 type: 'GET',
-                url: '{{ route('clerk.filterByGarden') }}',
+                url: '{{ route('admin.filterByGarden') }}',
                 data: { warehouseId },
                 success: function (response) {
                     // console.log(response)
@@ -191,7 +191,7 @@
 
             $.ajax({
                 type: 'GET',
-                url: '{{ route('clerk.filterByClient') }}',
+                url: '{{ route('admin.filterByClient') }}',
                 data: {warehouseBranchId, warehouseId},
                 success: function (response) {
                     $('#client').empty(); // Clear previous options
@@ -219,7 +219,7 @@
             var warehouseId = $('#warehouse').val();
             $.ajax({
                 type: 'GET',
-                url: '{{ route('clerk.filterBySaleNumber') }}',
+                url: '{{ route('admin.filterBySaleNumber') }}',
                 data: {warehouseBranchId, clientId, warehouseId},
                 success: function (response) {
                     var tableHtml = '<table class="table table-sm table-bordered table-striped" id="datatable" ><thead><th>Select</th><th>Client</th><th>Garden</th><th>Grade</th><th>Order Number</th><th>Invoice Number</th><th>Sale Number</th><th>Pcks</th><th>Pkg</th><th>Prompt Date</th></thead><tbody>';
@@ -272,7 +272,7 @@
             var idNumber = $(this).val();
 
             $.ajax({
-                url: '{{ route('clerk.fetchIdNumber') }}',
+                url: '{{ route('admin.fetchIdNumber') }}',
                 method: 'GET',
                 data: {idNumber},
                 dataType: 'json',

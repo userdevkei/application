@@ -169,7 +169,7 @@
                 var warehouseId = $('#warehouse').val();
                 $.ajax({
                     type: 'GET',
-                    url: '{{ route('clerk.filterWarehouseBranch') }}',
+                    url: '{{ route('admin.filterWarehouseBranch') }}',
                     data: { warehouseId },
                     success: function (response) {
                         // console.log(response)

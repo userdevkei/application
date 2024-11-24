@@ -1,7 +1,7 @@
-@extends('clerk::layouts.default')
+@extends('admin::layouts.default')
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/2.1.5/css/dataTables.dataTables.css">
-@section('clerk::dashboard')
+@section('admin::dashboard')
     <div class="card">
         <div class="card-header">
             <div class="row flex-between-center">
@@ -131,7 +131,7 @@
                 console.log(selectedStation)
                 $.ajax({
                     type: 'GET',
-                    url: '{{ route('clerk.filterWarehouseBay') }}',
+                    url: '{{ route('admin.filterWarehouseBay') }}',
                     data: {
                         selectedStation
                     },

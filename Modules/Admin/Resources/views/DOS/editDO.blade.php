@@ -1,12 +1,12 @@
-@extends('clerk::layouts.default')
+@extends('admin::layouts.default')
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/2.1.5/css/dataTables.dataTables.css">
-@section('clerk::dashboard')
+@section('admin::dashboard')
     <div class="card">
         <div class="card-header">
             <div class="row flex-between-center">
                 <div class="col-6 col-sm-auto d-flex align-items-center pe-0">
-                    <h5 class="fs-9 mb-0 text-nowrap py-0 py-xl-0">Add Delivery Order </h5>
+                    <h5 class="fs-9 mb-0 text-nowrap py-0 py-xl-0">Update Delivery Order </h5>
                 </div>
             </div>
         </div>
@@ -89,8 +89,9 @@
                             <div class="col-md-4 mb-3">
                                 <label for="organizerSingle">BROKER</label>
                                 <select class="form-select js-choice" size="1" name="broker_id" data-options='{"removeItemButton":true,"placeholder":true}'>
+                                    <option value=""> --select broker --</option>
                                     @foreach($brokers as $broker)
-                                        <option @if($order->broker_id == $broker->broker_id) @endif value="{{ $broker->broker_id }}">{{ $broker->broker_name }}</option>
+                                        <option @if($order->broker_id == $broker->broker_id) selected @endif value="{{ $broker->broker_id }}">{{ $broker->broker_name }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -107,25 +108,27 @@
 
                             <div class="col-md-4 mb-3">
                                 <label for="floatingInputValid">SALE DATE</label>
-                                <input class="form-control form-control-lg" type="date" value="{{ Carbon\Carbon::parse($order->sale_date)->format('Y-m-d') }}" name="sale_date" placeholder="provide total net weight" />
+                                <input class="form-control form-control-lg" type="date" value="{{ $order->sale_date !== null ?? Carbon\Carbon::parse($order->sale_date)->format('Y-m-d') }}" name="sale_date" placeholder="provide total net weight" />
                             </div>
 
                             <div class="col-md-4 mb-3">
                                 <label for="floatingInputValid">PROMPT DATE</label>
-                                <input class="form-control form-control-lg" value="{{ Carbon\Carbon::parse($order->prompt_date)->format('Y-m-d') }}" id="totalWeight" type="date" name="prompt_date" placeholder="provide total net weight" />
+                                <input class="form-control form-control-lg" value="{{ $order->prompt_date !== null ?? Carbon\Carbon::parse($order->prompt_date)->format('Y-m-d') }}" id="totalWeight" type="date" name="prompt_date" placeholder="provide total net weight" />
                             </div>
 
                             <div class="col-md-4 mb-3">
                                 <label for="organizerSingle">PRODUCER WAREHOUSE</label>
                                 <select class="form-select js-choice" id="warehouse" size="1" name="warehouse_id" data-options='{"removeItemButton":true,"placeholder":true}'>
+                                    <option value=""> --select warehouse --</option>
                                     @foreach($warehouses as $warehouse)
-                                        <option @if($order->warehouse_id == $warehouse->warehouse_id) @endif value="{{ $warehouse->warehouse_id }}">{{ $warehouse->warehouse_name }} </option>
+                                        <option @if($order->warehouse_id == $warehouse->warehouse_id) selected @endif value="{{ $warehouse->warehouse_id }}">{{ $warehouse->warehouse_name }} </option>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label for="organizerSingle">SUB WAREHOUSE </label>
                                 <select class="form-select form-select-lg" id="branch" size="1" name="branch" data-options='{"removeItemButton":true,"placeholder":true}'>
+                                    <option value="" @if($order->sub_warehouse_id === null ) selected @endif> --select sub warehouse --</option>
                                     <option selected value="{{ $order->sub_warehouse_id }}">{{ $order->sub_warehouse_name }}</option>
                                 </select>
                             </div>
@@ -133,6 +136,7 @@
                             <div class="col-md-4 mb-3">
                                 <label for="organizerSingle">SUB WAREHOUSE LOCALITY</label>
                                 <select class="form-select js-choice" id="warehouseBay" size="1" name="locality" data-options='{"removeItemButton":true,"placeholder":true}'>
+                                    <option value=""> --select warehouse locality --</option>
                                     <option @if($order->locality == 1) selected @endif value="1">ISLAND</option>
                                     <option @if($order->locality == 2) selected @endif value="2">CHANGAMWE</option>
                                     <option @if($order->locality == 3) selected @endif value="3">JOMVU</option>
@@ -160,7 +164,7 @@
                 var warehouseId = $('#warehouse').val();
                 $.ajax({
                     type: 'GET',
-                    url: '{{ route('clerk.filterWarehouseBranch') }}',
+                    url: '{{ route('admin.filterWarehouseBranch') }}',
                     data: { warehouseId },
                     success: function (response) {
                         // console.log(response)

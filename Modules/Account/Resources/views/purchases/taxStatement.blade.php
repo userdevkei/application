@@ -10,7 +10,9 @@
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
-                        <a class="btn btn-falcon-default btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#staticBackdrop"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">New Voucher</span></a>
+                        @if(auth()->user()->role_id == 9 || auth()->user()->role_id == 7)
+                            <a class="btn btn-falcon-default btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#staticBackdrop"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">New Voucher</span></a>
+                        @endif
                     </div>
                 </div>
                 <div class="modal fade" id="staticBackdrop" data-bs-keyboard="false" data-bs-backdrop="static" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
@@ -134,8 +136,8 @@
                             <td class="fw-bold">Ksh. {{ number_format($totalCredit, 2, '.', ',') }}</td>
                         </tr>
                         <tr class="text-center">
-                            <td colspan="4" class="fw-bold"> BALANCE</td>
-                            <td colspan="2" class="fw-bold"> Ksh. {{ number_format($totalBalance, 2, '.', ',') }}</td>
+                            <td colspan="4" class="fw-bold text-center"> BALANCE</td>
+                            <td colspan="2" class="fw-bold text-center"> Ksh. {{ number_format($totalBalance, 2, '.', ',') }}</td>
                         </tr>
                     </table>
                 </div>

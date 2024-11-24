@@ -17,7 +17,7 @@
                 <div class="table-responsive">
                     <table class="table table-striped table-bordered table-sm fs-sm mb-4">
                         <thead>
-                        <th colspan="6">DELIVERY ORDER DETAILS 
+                        <th colspan="6">DELIVERY ORDER DETAILS
                             <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                             <div id="table-simple-pagination-replace-element">
                                 <a class="link-info" href="{{ route('admin.editDO', $data->delivery_id) }}"><span class="fas fa-edit" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">Edit DO</span></a>
@@ -207,7 +207,18 @@
 
                         </table>
                     @endif
-                    @if(!empty($stocks['stock_ins'][0]['blend_processings']))
+                    @php
+                        $blendExists = false;
+                        foreach ($stocks['stock_ins'] as $stock) {
+                            if (isset($stock['blend_processings']) && !empty($stock['blend_processings'])) {
+                                $blendExists = true;
+                                break;
+                            } else {
+                                $blendExists = false;
+                            }
+                        }
+                    @endphp
+                    @if($blendExists)
                         <hr class="mb-4 mt-4">
                         <table  class="table table-striped table-bordered table-sm fs-sm mb-4">
                             <thead>
@@ -239,7 +250,18 @@
                             </tbody>
                         </table>
                     @endif
-                    @if(!empty($stocks['stock_ins'][0]['straight_line_shippings'] ))
+                    @php
+                        $stlExists = false;
+                        foreach ($stocks['stock_ins'] as $stock) {
+                            if (isset($stock['straight_line_shippings']) && !empty($stock['straight_line_shippings'])) {
+                                $stlExists = true;
+                                break;
+                            } else {
+                                $stlExists = false;
+                            }
+                        }
+                    @endphp
+                    @if($stlExists)
                         <hr class="mb-4 mt-4">
                         <table  class="table table-striped table-bordered table-sm fs-sm mb-4">
                             <thead>
@@ -310,7 +332,7 @@
                             <td> {{ $stock->driver_name }} </td>
                             <td> {{ $stock->id_number }} </td>
                             <td> {{ \Carbon\Carbon::createFromTimestamp($stock->date_received)->format('D, d/m/y H:i') }} </td>
-                            <?php $user = \App\Models\User::join('user_infos', 'user_infos.user_id', '=', 'users.user_id')->where('username', $stock->username)->first(); ?>
+                            <?php $user = \App\Models\UserInfo::where('user_id', $stock->received_by)->first(); ?>
                             <td> {{ $user->surname.' '.$user->first_name }} </td>
 
                         </tr>

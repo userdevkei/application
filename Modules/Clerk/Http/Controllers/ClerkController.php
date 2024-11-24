@@ -3,6 +3,7 @@
 namespace Modules\Clerk\Http\Controllers;
 
 use DateTime;
+use App\Imports\ImportDOS;
 use Carbon\Carbon;
 use App\Models\Grade;
 use App\Services\Log;
@@ -27,6 +28,7 @@ use App\Services\ExportTCI;
 use App\Models\BlendBalance;
 use App\Models\SubWarehouse;
 use App\Models\WarehouseBay;
+use App\Services\ExportTeaTransport;
 use Illuminate\Http\Request;
 use App\Models\BlendMaterial;
 use App\Models\BlendShipment;
@@ -120,8 +122,8 @@ class ClerkController extends Controller
                     $noTCI->whereNull('loading_instructions.delivery_id')  // No matching loading instruction
                         ->orWhereNotNull('loading_instructions.deleted_at');  // Exists but only where deleted_at is not null
                 })
-                ->get(); 
-        
+                ->get();
+
         //$noTCI->where('loading_number', '=', null)->get();
         $now = \Carbon\Carbon::now();
         $overstayed = $overstayed->whereRaw("DATE_ADD(delivery_orders.prompt_date, INTERVAL 7 DAY) <= '$now'")
@@ -189,7 +191,7 @@ class ClerkController extends Controller
             ->leftJoin('users as lu', 'lu.user_id', '=', 'li.created_by')
             ->select('u.username', 'g.garden_name', 'gr.grade_name', 'br.broker_name', 'wh.warehouse_name', 'wh.warehouse_id', 'cl.client_name', 'delivery_orders.*', 'tr.transporter_id', 'tr.transporter_name', 'dr.driver_id', 'dr.driver_name', 'dr.id_number', 'dr.phone', 'li.loading_id', 'li.loading_number', 'li.status as load_status', 'li.registration', 'li.created_by as load_user_id', 'lu.username as load_user', 'st.station_name', 'st.station_id', 'sub.sub_warehouse_name', 'li.deleted_at', 'delivery_orders.created_at as date_received')
             ->whereNull('delivery_orders.deleted_at')
-            ->where('delivery_type', 1)
+            ->where('delivery_orders.delivery_type', 1)
             ->orderBy('delivery_orders.created_at', 'desc');
 
         // Clone the query builder instance for each variable
@@ -210,8 +212,8 @@ class ClerkController extends Controller
                     $noTCI->whereNull('li.delivery_id')  // No matching loading instruction
                         ->orWhereNotNull('li.deleted_at');  // Exists but only where deleted_at is not null
                 })
-                ->get(); 
-        
+                ->get();
+
         // $noTCI->whereNull('li.loading_number')->get();
         $now = \Carbon\Carbon::now();
         $overstayed = $overstayed->whereRaw("DATE_ADD(delivery_orders.prompt_date, INTERVAL 7 DAY) <= '$now'")->where('li.status', 1)->get();
@@ -490,6 +492,7 @@ class ClerkController extends Controller
                             'requested_weight' => $delivery['weight'],
                             'destination' => $request->location,
                             'created_by' => auth()->user()->user_id,
+                            'delivery_type' => 2
                         ];
 
                         Transfers::create($transfer);
@@ -527,6 +530,7 @@ class ClerkController extends Controller
                             'requested_weight' => $delivery['weight'],
                             'destination' => $request->location,
                             'created_by' => auth()->user()->user_id,
+                            'delivery_type' => 2
                         ];
 
                         Transfers::create($transfer);
@@ -723,7 +727,10 @@ class ClerkController extends Controller
                             'pallet_weight' => 0,
                             'package_tare' => 0,
                             'net_weight' => $transferItem['weight'],
-                            'user_id' => auth()->user()->user_id
+                            'user_id' => auth()->user()->user_id,
+                            'registration' => $request->registration,
+                            'driver_id' => $driver->driver_id,
+                            'transporter_id' => $request->transporter,
                         ];
                         StockIn::create($stock);
 
@@ -758,7 +765,10 @@ class ClerkController extends Controller
                             'pallet_weight' => 0,
                             'package_tare' => 0,
                             'net_weight' => $transferItem['weight'],
-                            'user_id' => auth()->user()->user_id
+                            'user_id' => auth()->user()->user_id,
+                            'registration' => $request->registration,
+                            'driver_id' => $driverId,
+                            'transporter_id' => $request->transporter,
                         ];
 
                         StockIn::create($stock);
@@ -912,13 +922,15 @@ class ClerkController extends Controller
                     ->whereNull('loading_instructions.deleted_at');
             })
             ->select('delivery_orders.delivery_id','gardens.garden_name', 'grades.grade_name', 'brokers.broker_name', 'warehouses.warehouse_name', 'clients.client_name', 'delivery_orders.invoice_number', 'loading_instructions.loading_number', 'sub_warehouses.sub_warehouse_name', 'locality', 'lot_number')
-            ->where('delivery_type', 1)
+            ->where('delivery_orders.delivery_type', 1)
             ->whereNull('delivery_orders.deleted_at')
             ->orderBy('delivery_orders.created_at', 'desc')
             ->orderBy('delivery_orders.status', 'asc')
             ->take(3000)
             ->get();
-        return view('clerk::DOS.index')->with(['orders' => $orders]);
+
+        $clients = Client::all();
+        return view('clerk::DOS.index')->with(['orders' => $orders, 'clients' => $clients]);
     }
 
     public function addDeliveryOrders()
@@ -1040,8 +1052,7 @@ class ClerkController extends Controller
             'sale_date' => $request->sale_date,
             'prompt_date' => $request->prompt_date,
             'sub_warehouse_id' => $request->branch,
-            'locality' => $request->locality,
-            'created_by' => auth()->user()->user_id
+            'locality' => $request->locality
         ];
 
         DeliveryOrder::where('delivery_id', $id)->update($order);
@@ -1223,7 +1234,7 @@ class ClerkController extends Controller
 //            'driverPhone' => 'required',
         ]);
 
-        // return $loadingNumber = LoadingInstruction::newTCI();
+        //  return $loadingNumber = LoadingInstruction::newTCI();
 
         DB::beginTransaction();
 
@@ -1321,7 +1332,15 @@ class ClerkController extends Controller
             ->leftJoin('transporters', 'transporters.transporter_id', '=', 'loading_instructions.transporter_id')
             ->leftJoin('stations', 'stations.station_id', '=', 'loading_instructions.station_id')
             ->leftJoin('users as loading_user', 'loading_user.user_id', '=', 'loading_instructions.created_by')
-            ->leftJoin('stock_ins', 'stock_ins.delivery_id', '=', 'delivery_orders.delivery_id')
+            // ->leftJoin('stock_ins', 'stock_ins.delivery_id', '=', 'delivery_orders.delivery_id')
+            ->leftJoin('stock_ins', function ($join) {
+                $join->on('stock_ins.delivery_id', '=', 'delivery_orders.delivery_id')
+                     ->where('stock_ins.date_received', '=', function ($query) {
+                         $query->selectRaw('MIN(date_received)')
+                               ->from('stock_ins')
+                               ->whereColumn('stock_ins.delivery_id', 'delivery_orders.delivery_id');
+                     });
+            })
             ->whereNull('loading_instructions.deleted_at')
             ->select('users.username','users.user_id', 'gardens.garden_name', 'grades.grade_name', 'brokers.broker_name', 'warehouses.warehouse_name', 'clients.client_name', 'delivery_orders.*', 'transporters.transporter_id', 'transporters.transporter_name', 'drivers.driver_id', 'drivers.driver_name', 'drivers.id_number', 'drivers.phone', 'loading_instructions.loading_id', 'loading_instructions.loading_number', 'loading_instructions.status as load_status', 'loading_instructions.registration', 'loading_instructions.created_by as load_user_id', 'loading_user.username as load_user', 'stations.station_name', 'loading_instructions.deleted_at', 'stock_ins.total_pallets', 'stock_ins.total_weight', 'first_name', 'surname', 'sub_warehouse_name')
             ->orderBy('delivery_orders.created_at', 'desc')
@@ -1673,28 +1692,7 @@ class ClerkController extends Controller
                 && $delivery['deliveryId'] !== null;
         });
 
-
-
         $errors = [];
-
-//        $deliveries = array_filter($request->orders, function ($delivery) {
-//            // Check if all required keys exist in the delivery array
-//            return array_key_exists('numberPackages', $delivery)
-//                && array_key_exists('grossWeight', $delivery)
-//                && array_key_exists('packageTare', $delivery)
-//                && array_key_exists('paletteTare', $delivery)
-//                && array_key_exists('netWeight', $delivery)
-//                && array_key_exists('deliveryId', $delivery)
-//                // Check if any of the values are null
-//                && $delivery['numberPackages'] !== null
-//                && $delivery['grossWeight'] !== null
-//                && $delivery['packageTare'] !== null
-//                && $delivery['paletteTare'] !== null
-//                && $delivery['netWeight'] !== null
-//                && $delivery['deliveryId'] !== null
-//                /*&& $delivery['palletTare'] !== null*/;
-//        });
-
 
         DB::beginTransaction();
         try {
@@ -1762,6 +1760,7 @@ class ClerkController extends Controller
                             'driver_id' => $driverID,
                             'registration' => $request->registration,
                             'user_id' => auth()->user()->user_id,
+                            'delivery_type' => 1
                         ];
 
                         StockIn::create($stock);
@@ -1799,6 +1798,7 @@ class ClerkController extends Controller
                             'driver_id' => $driver->driver_id,
                             'registration' => $request->registration,
                             'user_id' => auth()->user()->user_id,
+                            'delivery_type' => 1
                         ];
 
                         StockIn::create($stock);
@@ -1973,7 +1973,7 @@ class ClerkController extends Controller
 
        $query = DB::table('currentstock')
             ->where('current_stock', '>', 0)
-            ->select('client_name', 'garden_name', 'grade_name', 'invoice_number', 'prompt_date', 'sale_number', 'sale_date',  'date_received', 'current_stock', 'current_weight', 'loading_number', 'warehouse_name', 'pallet_weight', 'package_tare', 'order_number', 'station_id')
+            ->select('received_by', 'delivery_type', 'lot_number', 'total_weight', 'stocked_at', 'bay_name', 'client_name', 'garden_name', 'grade_name', 'invoice_number', 'prompt_date', 'sale_number', 'sale_date',  'date_received', 'current_stock', 'current_weight', 'loading_number', 'warehouse_name', 'pallet_weight', 'package_tare', 'order_number', 'station_id', 'created_at')
             ->where('current_weight', '>', 0)
             ->orderBy('client_name', 'asc')
             ->orderBy('sortOrder', 'desc')
@@ -2001,6 +2001,13 @@ class ClerkController extends Controller
         }
 
         $results = $query->get();
+
+        ini_set('memory_limit', '10000M');
+        ini_set('max_execution_time', 30000);
+
+        if ($request->report == 2){
+            return Excel::download(new ExportStock($results), 'STOCK '.time().'.xlsx', \Maatwebsite\Excel\Excel::XLSX);
+        }
 
         $date = date('D, d-m-Y, h:i:s');
         $printed = auth()->user()->user;
@@ -2067,7 +2074,7 @@ class ClerkController extends Controller
 
                 $table->addCell(900, ['borderSize' => 1])->addText(\Carbon\Carbon::createFromTimestamp($stock->date_received)->format('d-m-y'), $text, ['space' => ['before' => 100]]);
                 $table->addCell(2000, ['borderSize' => 1])->addText($stock->warehouse_name, $text, ['space' => ['before' => 100]]);
-                
+
                 $totalPackets += $stock->current_stock;
                 $totalWeight += $stock->current_weight;
                 $grossWeight += floatval($stock->current_weight + ($stock->package_tare * $stock->current_stock + $stock->pallet_weight));
@@ -2132,7 +2139,7 @@ class ClerkController extends Controller
             ->leftJoin('stations', 'stations.station_id', '=', 'loading_instructions.station_id')
             ->leftJoin('users as loading_user', 'loading_user.user_id', '=', 'loading_instructions.created_by')
             ->leftJoin('stock_ins', 'stock_ins.delivery_id', '=', 'delivery_orders.delivery_id')
-            ->select('users.username', 'gardens.garden_name', 'grades.grade_name', 'brokers.broker_name', 'warehouses.warehouse_name', 'warehouses.warehouse_id', 'clients.client_name', 'delivery_orders.*', 'transporters.transporter_id', 'transporters.transporter_name', 'drivers.driver_id', 'drivers.driver_name', 'drivers.id_number', 'drivers.phone', 'loading_instructions.loading_id', 'loading_instructions.loading_number', 'loading_instructions.status as load_status', 'loading_instructions.registration', 'loading_instructions.created_by as load_user_id', 'loading_user.username as load_user', 'stations.station_name', 'stations.station_id', 'loading_instructions.deleted_at', 'delivery_orders.sale_number', 'stock_ins.date_received', 'user_infos.first_name', 'user_infos.surname', 'sub_warehouse_name', 'delivery_type')
+            ->select('users.username', 'gardens.garden_name', 'grades.grade_name', 'brokers.broker_name', 'warehouses.warehouse_name', 'warehouses.warehouse_id', 'clients.client_name', 'delivery_orders.*', 'transporters.transporter_id', 'transporters.transporter_name', 'drivers.driver_id', 'drivers.driver_name', 'drivers.id_number', 'drivers.phone', 'loading_instructions.loading_id', 'loading_instructions.loading_number', 'loading_instructions.status as load_status', 'loading_instructions.registration', 'loading_instructions.created_by as load_user_id', 'loading_user.username as load_user', 'stations.station_name', 'stations.station_id', 'loading_instructions.deleted_at', 'delivery_orders.sale_number', 'stock_ins.date_received', 'user_infos.first_name', 'user_infos.surname', 'sub_warehouse_name', 'delivery_orders.delivery_type')
             ->orderBy('delivery_orders.created_at', 'desc');
 
         if (!is_null($client)) {
@@ -2141,11 +2148,11 @@ class ClerkController extends Controller
 
         if (!is_null($delivery)) {
             if ($delivery == 1){
-                $query->where('delivery_type', 1);
+                $query->where('delivery_orders.delivery_type', 1);
             }elseif ($delivery == 2){
-                $query->where('delivery_type', 2);
+                $query->where('delivery_orders.delivery_type', 2);
             }else{
-                $query->whereIn('delivery_type', [1, 2]);
+                $query->whereIn('delivery_orders.delivery_type', [1, 2]);
             }
         }
 
@@ -2358,8 +2365,8 @@ class ClerkController extends Controller
                     $query->whereNull('loading_instructions.delivery_id')  // No matching loading instruction
                         ->orWhereNotNull('loading_instructions.deleted_at');  // Exists but only where deleted_at is not null
                 })
-                ->get(); 
-                        
+                ->get();
+
        $stations = Station::where('status', 1)->get();
        $transporters = Transporter::all();
        $registrations = LoadingInstruction::pluck('registration')->toArray();
@@ -3289,7 +3296,7 @@ class ClerkController extends Controller
 
             // Commit the transaction
             DB::commit();
-            return redirect()->route('admin.viewBlendProcessing')->with('success', 'Success! Blend sheet updated successfully');
+            return redirect()->route('clerk.viewBlendProcessing')->with('success', 'Success! Blend sheet updated successfully');
 
         } catch (\Exception $e) {
             // Rollback the transaction if an exception occurs
@@ -3356,7 +3363,7 @@ class ClerkController extends Controller
                     ->on('blendBalances.blend_id', '=', 'blend_teas.delivery_id');
             })
             ->select('blended_id', 'blend_teas.blended_packages', 'blend_teas.blended_weight', 'blend_teas.status', 'garden_name', 'grade_name', 'grade', 'garden', 'loading_number', 'sale_number', 'prompt_date', 'invoice_number', 'blend_number', 'blend_date')
-            ->where('blend_teas.blend_id', $id)
+            ->where(['blend_teas.blend_id' => $id])
             ->orderBy('blend_teas.created_at', 'desc')
             ->get();
 
@@ -3367,8 +3374,10 @@ class ClerkController extends Controller
         $blendBalances = BlendBalance::where('blend_id', $id)->whereNull('deleted_at')->get();
 
         foreach ($blendBalances as $bal){
-            $balPacks += $bal->ex_packages;
-            $balWeight += $bal->net_weight;
+            if($bal->type == 1){
+                $balPacks += $bal->ex_packages;
+                $balWeight += $bal->net_weight;
+            }
         }
 
         $domPdfPath = base_path('vendor/dompdf/dompdf');
@@ -3538,7 +3547,7 @@ class ClerkController extends Controller
             )
             ->selectRaw('SUM(total_pallets) AS total_packages')
             ->selectRaw('SUM(net_weight) AS total_net_weight')
-            ->where('delivery_type', 2)
+            ->where('delivery_orders.delivery_type', 2)
             ->groupBy('order_number', 'client_name',
                 'tea_id',
                 'warehouse_name',
@@ -3574,7 +3583,7 @@ class ClerkController extends Controller
             ->leftJoin('stations', 'stations.station_id', '=', 'stock_ins.station_id')
             ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'delivery_orders.warehouse_id')
             ->select('client_name', 'invoice_number', 'tea_id', 'garden_name', 'grade_name',  'delivery_orders.delivery_id', 'order_number', 'client_name', 'tea_id', 'warehouse_name', 'station_name', 'delivery_orders.status as order_status', 'garden_name', 'grade_name', 'packet', 'weight')
-            ->where(['delivery_type' => 2, 'order_number' => $delId])
+            ->where(['delivery_orders.delivery_type' => 2, 'order_number' => $delId])
             ->latest('delivery_orders.created_at')
             ->get();
 
@@ -5019,7 +5028,7 @@ class ClerkController extends Controller
                 ->join('warehouses', 'warehouses.warehouse_id', '=', 'delivery_orders.warehouse_id')
                 ->join('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
                 ->join('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
-                ->select('client_name', 'sale_number', 'warehouse_name', 'garden_name', 'grade_name', 'delivery_type','invoice_number', 'lot_number', 'order_number', 'packet', 'weight', 'delivery_orders.status')
+                ->select('client_name', 'sale_number', 'warehouse_name', 'garden_name', 'grade_name', 'delivery_orders.delivery_type','invoice_number', 'lot_number', 'order_number', 'packet', 'weight', 'delivery_orders.status')
                 ->where(['delivery_orders.client_id' => $request->client_id])
                 ->orderBy('garden_name', 'asc');
 
@@ -5035,7 +5044,7 @@ class ClerkController extends Controller
                 $data->where('delivery_orders.created_at', '<=', $request->date_to);
             }
 
-            $reports = $data->get();
+           $reports = $data->get();
 
             $date = date('D, d-m-Y, h:i:s');
             $printed = auth()->user()->user;
@@ -5143,4 +5152,48 @@ class ClerkController extends Controller
           ReportRequest::where(['request_id' => $id])->update(['status' => 1, 'approved_by' => auth()->user()->user_id]);
           return redirect()->back()->with('success', 'Success! Report request has been approved');
       }
+
+      public function exportTransportReport(Request $request)
+      {
+          $from = $request->from;
+          $to = $request->to;
+          $query = DB::table('transportreport');
+
+          if (!is_null($from)) {
+              $fromTimestamp = strtotime($from);
+              $query->where('date_received', '>=', $fromTimestamp);
+          }
+          if (!is_null($to)) {
+              $toTimestamp = strtotime($to);
+              $query->where('date_received', '<=', $toTimestamp);
+          }
+
+         $orders = $query->get();
+
+         ini_set('memory_limit', '10000M');
+         ini_set('max_execution_time', 30000);
+
+          return Excel::download(new ExportTeaTransport($orders), 'TRANSPORTERS'.' '.time().'.xlsx', \Maatwebsite\Excel\Excel::XLSX);
+
+      }
+
+      public function ImportDOS(Request $request)
+    {
+        $clientId = $request->clientId;
+        $import = new ImportDOS($clientId);
+
+        // Perform the import
+        Excel::import($import, $request->file('uploadFile'));
+
+        // Get specific errors
+        $errors = $import->getErrors();
+
+        if (!empty($errors)) {
+            return redirect()->back()->with('importErrors', $errors);
+        } else {
+            // If no errors, continue with your desired action
+
+            return redirect()->back()->with('success', 'Successful! DOS have been imported successfully');
+        }
+    }
 }

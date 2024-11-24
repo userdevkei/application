@@ -10,7 +10,7 @@ class StockIn extends Model
 {
     use HasFactory, softDeletes;
 
-    protected $fillable = ['stock_id', 'delivery_id', 'station_id', 'date_received', 'delivery_number', 'warehouse_bay', 'total_weight', 'total_pallets', 'user_id', 'pallet_weight', 'net_weight', 'package_tare', 'transporter_id', 'driver_id', 'registration', 'deleted_at'];
+    protected $fillable = ['stock_id', 'delivery_id', 'station_id', 'date_received', 'delivery_number', 'warehouse_bay', 'total_weight', 'total_pallets', 'user_id', 'pallet_weight', 'net_weight', 'package_tare', 'transporter_id', 'driver_id', 'registration', 'deleted_at', 'delivery_type'];
 
     protected $primaryKey = 'stock_id';
 
@@ -37,11 +37,13 @@ class StockIn extends Model
 
     public function blendProcessings()
     {
-        return $this->hasMany(BlendTea::class, 'stock_id');
+        return $this->hasMany(BlendTea::class, 'stock_id')
+            ->whereColumn('delivery_id', 'delivery_id');
     }
 
     public function straightLineShippings()
     {
-        return $this->hasMany(Shipment::class, 'stock_id');
+        return $this->hasMany(Shipment::class, 'stock_id')
+            ->whereColumn('delivery_id', 'delivery_id');
     }
 }

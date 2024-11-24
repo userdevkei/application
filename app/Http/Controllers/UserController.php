@@ -45,7 +45,7 @@ class UserController extends Controller
             if (auth()->user()->role_id == 1) {
                 $this->logger->create();
                 return redirect()->route('admin.dashboard')->with('success', 'Successful! You logged in successfully');
-            }elseif(auth()->user()->role_id == 7) {
+            }elseif(auth()->user()->role_id == 7 || auth()->user()->role_id == 8 || auth()->user()->role_id == 9) {
                 $this->logger->create();
                 return redirect()->route('accounts.dashboard')->with('success', 'Successful! You logged in successfully');
 

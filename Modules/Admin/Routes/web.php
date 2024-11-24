@@ -15,7 +15,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Admin\Http\Controllers\AdminController;
 
-Route::prefix('admin')->middleware(['auth', 'web', 'userRoles', 'adminRole', 'userRole:1'])->group(function() {
+Route::prefix('admin')->middleware(['auth', 'web', 'userRoles', 'userRole:1'])->group(function() {
     Route::get('/', [AdminController::class, 'index'])->name('admin.dashboard');
     Route::get('dashboard-report/{id}', [AdminController::class, 'dashboardReport'])->name('admin.dashboardReport');
     Route::get('users', [AdminController::class, 'users'])->name('admin.users');
@@ -197,6 +197,7 @@ Route::prefix('admin')->middleware(['auth', 'web', 'userRoles', 'adminRole', 'us
     Route::get('tea-samples-request', [AdminController::class,'teaSamplesRequest'])->name('admin.teaSamplesRequest');
     Route::get('withdraw-sample/{id}', [AdminController::class,'withdrawSample'])->name('admin.withdrawSample');
     Route::post('store-sample-request/{id}', [AdminController::class,'storeSampleRequest'])->name('admin.storeSampleRequest');
+    Route::get('clerk-fetch-station-to-request-transfer-from', [ClerkController::class, 'selectStation'])->name('admin.selectStation');
 
     Route::get('view-all-report-requests', [AdminController::class, 'viewReportRequest'])->name('admin.viewReportRequest');
     Route::get('filter-report-request', [AdminController::class, 'filterReports'])->name('admin.filterReports');

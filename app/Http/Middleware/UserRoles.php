@@ -40,7 +40,7 @@ class UserRoles
             if ($sessionRoleId !== null && $sessionRoleId !== $currentUser->role_id) {
                 Auth::logout();
                 Session::flush();
-                return redirect('/')->withErrors('Oops! Invalidsession. Please log in again.');
+                return redirect('/')->withErrors('Oops! Invalid session. Please log in again.');
             }
 
             // Store the current user_id and role_id in session if they are not set

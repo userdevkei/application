@@ -56,7 +56,7 @@
                                             @elseif($transfer->status == 0)
                                                 <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer initiated, pending approval"> <span class="fa-regular fa-hourglass-half"></span> </a>
                                             @elseif($transfer->status == 1 && $transfer->origin === auth()->user()->station->location->location_id)
-                                                <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer approved, release transfer"  onclick="return confirm('Are you sure you want to release teas for this request?')" href="{{ route('clerk.serviceRequest', base64_encode($transfer->delivery_number)) }}"> <span class="fa-solid fa-retweet"></span> </a>
+                                                <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer approved, release transfer"  onclick="return confirm('Are you sure you want to release teas for this request?')" href="{{ route('admin.serviceRequest', base64_encode($transfer->delivery_number)) }}"> <span class="fa-solid fa-retweet"></span> </a>
                                             @elseif($transfer->status == 1)
                                                 <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer approved, pending release"> <span class="fa-solid fa-check"> </span> </a>
                                             @elseif($transfer->status == 2)
@@ -133,7 +133,7 @@
 
             $.ajax({
                 type: 'GET',
-                url: '{{ route('clerk.selectStation') }}',
+                url: '{{ route('admin.selectStation') }}',
                 data: { stationId },
                 success:function (response) {
                     console.log(response)
@@ -153,7 +153,7 @@
             var warehouseId = $(this).val();
             $.ajax({
                 type: 'GET',
-                url: '{{ route('clerk.selectClients') }}',
+                url: '{{ route('admin.selectClients') }}',
                 data: { warehouseId },
                 success:function (response) {
                     console.log(response)

@@ -1,6 +1,6 @@
 @extends('account::layouts.default')
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://cdn.datatables.net/2.1.5/css/dataTables.dataTables.css">
+{{--<link rel="stylesheet" href="https://cdn.datatables.net/2.1.5/css/dataTables.dataTables.css">--}}
 @section('account::dashboard')
     <div class="card">
         <div class="card-header">
@@ -20,10 +20,10 @@
                                 // Calculate the difference in days
                                 $dateDiff = $dateInv->diffInDays($dueDate, false);
                                 $daysToGo = $today->diffInDays($dueDate, false);
-
-                                $percentage = round(($daysToGo/ abs($dateDiff)) * 100, 2);
+//
+                                $percentage = $dateDiff == 0 ? round(-1 * 100, 2) : round(($daysToGo/ abs($dateDiff)) * 100, 2);
                                 if ($dueDate->lt($today)) {
-                                    $daysToGo = -$daysToGo;
+                                    $dateDiff == 0 ? $daysToGo : $daysToGo = -$daysToGo;
                                 }
                         @endphp
 
@@ -32,7 +32,7 @@
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
-                        <span class="text-info"></span>
+                        <a class="btn btn-falcon-default btn-sm" href="{{ route('accounts.downloadInvoice', $account->invoice_id) }}" target="_blank"><span class="fas fa-cloud-download-alt" ></span><span class="d-none d-sm-inline-block ms-1">New Invoice</span></a>
                     </div>
                 </div>
 

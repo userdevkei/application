@@ -14,7 +14,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Account\Http\Controllers\AccountController;
 
-Route::prefix('account')->middleware(['auth', 'web'])->group(function() {
+Route::prefix('account')->middleware(['auth', 'web', 'userRoles', 'userRole:7,8,9'])->group(function() {
     Route::get('/', [AccountController::class, 'index'])->name('accounts.dashboard');
     Route::get('view-accounts', [AccountController::class, 'viewAccounts'])->name('accounts.viewAccounts');
     Route::post('register-account', [AccountController::class, 'registerAccount'])->name('accounts.registerAccount');
@@ -102,7 +102,10 @@ Route::prefix('account')->middleware(['auth', 'web'])->group(function() {
     Route::post('post-purchase-created-invoice/{id}', [AccountController::class, 'postPurchaseInvoice'])->name('accounts.postPurchaseInvoice');
     Route::get('delete-purchase-sale-invoice/{id}', [AccountController::class, 'deletePurchaseInvoice'])->name('accounts.deletePurchaseInvoice');
     Route::get('create-credit-note/{id}', [AccountController::class, 'createCreditNote'])->name('accounts.createCreditNote');
+    Route::get('sales-invoice-distribution/{id}', [AccountController::class, 'salesInvoiceDistribution'])->name('accounts.salesInvoiceDistribution');
+    Route::get('edit-sales-invoice/{id}', [AccountController::class, 'editSalesInvoice'])->name('accounts.editSalesInvoice');
     Route::post('store-credit-note/{id}', [AccountController::class, 'storeCreditNote'])->name('accounts.storeCreditNote');
+    Route::post('update-sales-invoice/{id}', [AccountController::class, 'updateSalesInvoice'])->name('accounts.updateSalesInvoice');
 
     Route::get('fetch-purchase-invoice_number', [AccountController::class, 'fetchPurchaseInvNumber'])->name('accounts.fetchPurchaseInvNumber');
     Route::get('download-purchase-invoice/{id}', [AccountController::class, 'downloadPurchaseVoucher'])->name('accounts.downloadPurchaseVoucher');
@@ -121,4 +124,35 @@ Route::prefix('account')->middleware(['auth', 'web'])->group(function() {
     Route::get('delete-exchange-rate/{id}', [AccountController::class, 'deleteCurrencyExchangeRate'])->name('accounts.deleteCurrencyExchangeRate');
 
     Route::any('generate-vat-tax-report', [AccountController::class, 'generateVatTaxReport'])->name('accounts.generateVatTaxReport');
+    Route::any('generate-sales-summary/{id}', [AccountController::class, 'generateSalesSummary'])->name('accounts.generateSalesSummary');
+    Route::any('generate-client-statement-summary', [AccountController::class, 'generateClientStatement'])->name('accounts.generateClientStatement');
+    Route::any('generate-ledger-statement-summary', [AccountController::class, 'generateLedgerStatement'])->name('accounts.generateLedgerStatement');
+    Route::any('generate-expense-ledger-statement-summary', [AccountController::class, 'generateExpenseLedgerStatement'])->name('accounts.generateExpenseLedgerStatement');
+    Route::any('generate-all-expense-ledger-statement', [AccountController::class, 'generateAllExpenseLedgerStatement'])->name('accounts.generateAllExpenseLedgerStatement');
+    Route::any('generate-all-ledger-statement', [AccountController::class, 'generateAllLedgerStatement'])->name('accounts.generateAllLedgerStatement');
+
+    Route::get('view-transport-details', [AccountController::class, 'transportDetails'])->name('accounts.transportDetails');
+    Route::any('export-transport-details', [AccountController::class, 'exportTransportReport'])->name('accounts.exportTransportReport');
+
+    Route::get('financial-year-ledger-statement', [AccountController::class, 'getLedgerFinancialYears'])->name('accounts.getLedgerFinancialYears');
+    Route::get('view-yearly-ledger-statement/{id}', [AccountController::class, 'getLedgerWithInvoices'])->name('accounts.getLedgerWithInvoices');
+    Route::get('view-ledger-statement/{id}', [AccountController::class, 'viewLedgerStatement'])->name('accounts.viewLedgerStatement');
+
+    Route::get('financial-year-expense-ledger-statement', [AccountController::class, 'getExpenseLedgerFinancialYears'])->name('accounts.getExpenseLedgerFinancialYears');
+    Route::get('view-yearly-expense-ledger-statement/{id}', [AccountController::class, 'getExpenseLedgerWithInvoices'])->name('accounts.getExpenseLedgerWithInvoices');
+    Route::get('view-expense-ledger-statement/{id}', [AccountController::class, 'viewExpenseLedgerStatement'])->name('accounts.viewExpenseLedgerStatement');
+
+    Route::post('update-opening-balance', [AccountController::class, 'updateOpeningBalance'])->name('accounts.updateOpeningBalance');
+
+    Route::get('view-purchase-payments', [AccountController::class, 'viewPurchasePayments'])->name('accounts.viewPurchasePayments');
+    Route::get('view-purchase-payments-distribution/{id}', [AccountController::class, 'purchaseVoucherDistribution'])->name('accounts.purchaseVoucherDistribution');
+    Route::post('store-purchase-payment-invoice', [AccountController::class, 'storePurchasePaymentInvoice'])->name('accounts.storePurchasePaymentInvoice');
+
+    Route::get('aging-analysis-report', [AccountController::class, 'viewAgingAnalysis'])->name('accounts.viewAgingAnalysis');
+    Route::get('view-aging-analysis-report/{id}', [AccountController::class, 'viewAgingReport'])->name('accounts.viewAgingReport');
+    Route::get('view-aging-invoices/{id}', [AccountController::class, 'viewAgingInvoices'])->name('accounts.viewAgingInvoices');
+
+
+    Route::get('/update-transactions-invoices', [AccountController::class, 'updateTransactionsInvoices'])->name('accounts.updateTransactionsInvoices');
+
 });

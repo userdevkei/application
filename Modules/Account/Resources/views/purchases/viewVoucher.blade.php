@@ -32,7 +32,8 @@
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
-                        <span class="text-info"></span>
+                        <a class="btn btn-falcon-default btn-sm"href="{{ route('accounts.downloadPurchaseVoucher', $account->purchase_id) }}" target="_blank"><span class="fas fa-file-download" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">Download</span></a>
+
                     </div>
                 </div>
 
@@ -44,6 +45,7 @@
                     <table class="table mb-0 table-sm table-bordered table-striped" id="datatable">
                         <thead class="bg-200">
                         <tr>
+                            <th>#</th>
                             <th>INVOICE ITEM</th>
                             <th>Description</th>
                             <th>VATABLE</th>
@@ -54,7 +56,7 @@
                         </tr>
                         </thead>
                         <tbody>
-                        <?php $subTotal = 0; $totalTax = 0; $totalDue = 0; ?>
+                        <?php $subTotal = 0; $totalTax = 0; $totalDue = 0; $wht = 0;?>
                         @foreach($invoices as $invoice)
                             <tr>
                                 <td> {{ $loop->iteration }} </td>
@@ -62,33 +64,38 @@
                                 <td> {{ $invoice->description }} </td>
                                 <td> {{ $invoice->tax_name }} {{ $invoice->tax_rate == null ? 0 : $invoice->tax_rate }}%</td>
                                 <td> {{ $invoice->quantity }}</td>
-                                <td> {{ $account->currency_symbol }} {{ number_format($invoice->unit_price, 2) }}</td>
-                                <td> {{ $account->currency_symbol }} {{ number_format($invoice->unit_price * $invoice->quantity, 2) }}</td>
+                                <td> {{ number_format($invoice->unit_price, 2) }}</td>
+                                <td class="text-end"> {{ number_format($invoice->unit_price * $invoice->quantity, 2) }}</td>
+                                <td class="text-end">0.00</td>
                             </tr>
                                 <?php
                                 $totalTax += $invoice->unit_price * $invoice->quantity * ($invoice->tax_rate/100);
                                 $subTotal += $invoice->unit_price * $invoice->quantity;
+                                $wht += $invoice->tax_rate == null ? 0 : (($invoice->unit_price * $invoice->quantity) * $invoice->taxRate/100);
                                 ?>
                         @endforeach
-                        <?php $totalDue = $subTotal; $withHolding = $totalDue * $invoices[0]['taxRate']/100; ?>
+                        <?php $totalDue = $subTotal; $withHolding = $wht; $totalAmountDue = $totalDue + $totalTax - $wht; ?>
                         </tbody>
                         <tr>
                             <td colspan="6" class="text-end fw-bold">SUBTOTAL </td>
-                            <td class="fw-bold">{{ $account->currency_symbol }} {{ number_format($subTotal, 2) }}</td>
+                            <td class="fw-bold text-end">{{ number_format($subTotal, 2) }}</td>
+                            <td class="text-end">0.00</td>
                         </tr>
                         <tr>
-                            <td colspan="6" class="text-end fw-bold"> TOTAL VAT TAX</td>
-                            <td class="fw-bold">{{ $account->currency_symbol }} {{ number_format($totalTax, 2) }}</td>
+                            <td colspan="6" class="text-end fw-bold"> TOTAL VAT</td>
+                            <td class="fw-bold text-end"> {{ number_format($totalTax, 2) }}</td>
+                            <td class="text-end">0.00</td>
                         </tr>
 
                         <tr>
-                            <td colspan="6" class="text-end fw-bold"> TOTAL VAT TAX {{ $invoices[0]['taxRate'] }}</td>
-                            <td class="fw-bold">{{ $account->currency_symbol }} {{ number_format($withHolding, 2) }}</td>
+                            <td colspan="6" class="text-end fw-bold"> TOTAL WHT {{ $invoices[0]['taxRate'] }}</td>
+                            <td class="text-end">0.00</td>
+                            <td class="fw-bold text-end"> {{ number_format($withHolding, 2) }}</td>
                         </tr>
 
                         <tr>
                             <td colspan="6" class="text-end fw-bold"> AMOUNT DUE</td>
-                            <td class="fw-bold">{{ $account->currency_symbol }} {{ number_format($totalDue - $withHolding, 2) }}</td>
+                            <td colspan="2" class="fw-bold text-center">{{ $account->currency_symbol }} {{ number_format($totalAmountDue, 2) }}</td>
                         </tr>
                     </table>
                 </div>

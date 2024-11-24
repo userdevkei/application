@@ -11,7 +11,7 @@ class Purchase extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['purchase_id', 'invoice_number', 'voucher_number', 'client_id', 'tax_id', 'date_invoiced', 'due_date', 'financial_year_id', 'customer_message', 'status', 'user_id', 'amount_due', 'kra_number', 'posted'];
+    protected $fillable = ['purchase_id', 'invoice_number', 'voucher_number', 'client_id', 'tax_id', 'date_invoiced', 'due_date', 'financial_year_id', 'customer_message', 'status', 'user_id', 'amount_due', 'kra_number', 'posted', 'type'];
     protected $date = 'deleted_at';
     protected $primaryKey = 'purchase_id';
     protected $keyType = 'string';

@@ -10,7 +10,12 @@
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
-                        <a class="btn btn-falcon-default btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#staticBackdrop"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">New Voucher</span></a>
+                        @if(auth()->user()->role_id == 8)
+                            <a class="btn btn-falcon-default btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#staticBackdrop"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">New Voucher</span></a>
+                        @endif
+                            @if(auth()->user()->role_id == 8)
+                                {{-- <a class="btn btn-falcon-default btn-sm" href="{{ route('accounts.updateTransactionsInvoices') }}"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">Update Transactions</span></a> --}}
+                            @endif
                     </div>
                 </div>
                 <div class="modal fade" id="staticBackdrop" data-bs-keyboard="false" data-bs-backdrop="static" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
@@ -28,24 +33,26 @@
                                         <form method="POST" action="{{ route('accounts.storePaymentInvoice') }}">
                                             <div class="row row-cols-sm-2 g-2">
                                                 @csrf
-                                                <div class="form-floating mb-4">
-                                                    <select class="form-select financialYear" id="financialYear" name="financialYear" required>
+                                                <div class="mb-4">
+                                                    <select class="form-select js-choice" id="financialYear" size="1" name="financialYear" data-options='{"removeItemButton":true,"placeholder":true}'>
+                                                    {{--                                                    <select class="form-select financialYear" id="financialYear" name="financialYear" required>--}}
                                                         <option value="">-- select financial year --</option>
                                                         @foreach($years as $fy)
                                                             <option value="{{ $fy['financial_year_id'] }}">{{ $fy['financial_year'] }}</option>
                                                         @endforeach
                                                     </select>
-                                                    <label>TRANSACTION FINANCIAL YEAR</label>
+{{--                                                    <label>TRANSACTION FINANCIAL YEAR</label>--}}
                                                 </div>
 
                                                 <div class="form-floating mb-4">
-                                                    <select class="form-select choices" id="clientAccount" name="clientAccount" required>
-                                                        <option value="" class="text-center">-- select an account to credit --</option>
+                                                    <select class="form-select js-choice" id="clientAccount" size="2" name="clientAccount" data-options='{"removeItemButton":true,"placeholder":true}' style="height: 125% !important;">
+                                                    {{--                                                    <select class="form-select choices" id="clientAccount" name="clientAccount" required>--}}
+                                                        <option selected disabled value="" class="text-center">-- select an account to credit --</option>
                                                         @foreach($accounts as $account)
                                                             <option value="{{ $account->client_account_id }}">{{ $account->client_account_name }} {{ $account->currency_symbol }}</option>
                                                         @endforeach
                                                     </select>
-                                                    <label>PAYMENT FOR ACCOUNT</label>
+{{--                                                    <label>PAYMENT FOR ACCOUNT</label>--}}
                                                 </div>
 
                                                 <div class="form-floating mb-4">
@@ -97,7 +104,7 @@
                             <th>#</th>
                             <th>INVOICE NUMBER</th>
                             <th>FINANCIAL YEAR</th>
-                            <th>CLIENT/ACCOUNT NAME CREDITED</th>
+                            <th>CLIENT ACCOUNT NAME</th>
                             <th>ACCOUNT PAID</th>
                             <th>TRANSACTION/CHEQUE #</th>
                             <th>AMOUNT RECEIVED</th>
@@ -118,6 +125,7 @@
                                 <td> {{ \Carbon\Carbon::createFromTimestamp($invoice->date_received)->format('D, d/m/y') }} </td>
                                 <td>
                                     <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Download Payment Voucher" href="{{ route('accounts.downloadPaymentReceipt', $invoice->transaction_id) }}"> <span class="fa-solid fa-file-download"></span> </a>
+                                    <a class="link text-secondary m-2" data-bs-toggle="tooltip" data-bs-placement="left" title="View Payment Distribution" href="{{ route('accounts.salesInvoiceDistribution', $invoice->transaction_id) }}"> <span class="fas fa-folder-open"> </span> </a>
                                 </td>
                             </tr>
                         @endforeach

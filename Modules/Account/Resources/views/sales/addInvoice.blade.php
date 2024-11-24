@@ -246,6 +246,40 @@
 
         let itemIndex = 1;
 
+        // $('#addItemButton').on('click', function() {
+        //     event.preventDefault();
+        //     const selectedItem = $('#itemSelect').find('option:selected');
+        //     const itemName = selectedItem.data('name');
+        //     const perCost = selectedItem.data('rate');
+        //     const clientId = selectedItem.data('account');
+        //     const itemId = selectedItem.val();
+        //
+        //     // const itemRate = perCost === '' || perCost === 'undefined' ? 0 : perCost;
+        //     const itemRate = (perCost === '' || typeof perCost === 'undefined') ? 0 : perCost;
+        //
+        //     if (!itemId) {
+        //         alert('Please select an item to add.');
+        //         return;
+        //     }
+        //
+        //     const row = `
+        //             <tr>
+        //                 <td>${itemIndex}</td>
+        //                 <td contenteditable="true">${itemName}</td>
+        //                 <td><input type="text" class="form-control" name="items[${clientId}][description]" /></td>
+        //                 <td><input type="number" step="0.0001" class="form-control quantity" name="items[${clientId}][quantity]" value="1" required /></td>
+        //                 <td><input type="number" step="0.0001" class="form-control rate" name="items[${clientId}][rate]" value="${perCost}" required /></td>
+        //                 <td><select class="form-control form-control-sm vatable" name="items[${clientId}][vatable]"><option value="0">Non-Vatable</option><option value="1">Vatable</option></select></td>
+        //                 <td class="amount">${itemRate}</td>
+        //                 <td><a class="btn-link text-danger btn-sm removeItemButton" title="remove item"><span class="fa-solid fa-trash-can"></span></a> </td>
+        //             </tr>
+        //         `;
+        //
+        //     $('#invoiceItems').append(row);
+        //     itemIndex++;
+        //     calculateTotal();
+        // });
+
         $('#addItemButton').on('click', function() {
             event.preventDefault();
             const selectedItem = $('#itemSelect').find('option:selected');
@@ -262,32 +296,31 @@
                 return;
             }
 
+            // Check if item already exists in the table
+            const existingItem = $(`#invoiceItems tr[data-item-id="${itemId}"]`);
+            if (existingItem.length > 0) {
+                alert('This item has already been added.');
+                return;
+            }
+
             const row = `
-                    <tr>
-                        <td>${itemIndex}</td>
-                        <td contenteditable="true">${itemName}</td>
-                        <td><input type="text" class="form-control" name="items[${clientId}][description]" /></td>
-                        <td><input type="number" step="0.0001" class="form-control quantity" name="items[${clientId}][quantity]" value="1" required /></td>
-                        <td><input type="number" step="0.0001" class="form-control rate" name="items[${clientId}][rate]" value="${perCost}" required /></td>
-                        <td><select class="form-control form-control-sm vatable" name="items[${clientId}][vatable]"><option value="0">Non-Vatable</option><option value="1">Vatable</option></select></td>
-                        <td class="amount">${itemRate}</td>
-                        <td><a class="btn-link text-danger btn-sm removeItemButton" title="remove item">
-                            <span class="btn-inner">
-                                 <svg class="icon-18" width="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor">
-                                       <path d="M19.3248 9.46826C19.3248 9.46826 18.7818 16.2033 18.4668 19.0403C18.3168 20.3953 17.4798 21.1893 16.1088 21.2143C13.4998 21.2613 10.8878 21.2643 8.27979 21.2093C6.96079 21.1823 6.13779 20.3783 5.99079 19.0473C5.67379 16.1853 5.13379 9.46826 5.13379 9.46826"
-                                                      stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                                       <path d="M20.708 6.23975H3.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                                       <path d="M17.4406 6.23973C16.6556 6.23973 15.9796 5.68473 15.8256 4.91573L15.5826 3.69973C15.4326 3.13873 14.9246 2.75073 14.3456 2.75073H10.1126C9.53358 2.75073 9.02558 3.13873 8.87558 3.69973L8.63258 4.91573C8.47858 5.68473 7.80258 6.23973 7.01758 6.23973" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-                                 </svg>
-                            </span>
-                        </a> </td>
-                    </tr>
-                `;
+        <tr data-item-id="${itemId}">
+            <td>${itemIndex}</td>
+            <td contenteditable="true">${itemName}</td>
+            <td><input type="text" class="form-control" name="items[${clientId}][description]" /></td>
+            <td><input type="number" step="0.0001" class="form-control quantity" name="items[${clientId}][quantity]" value="1" required /></td>
+            <td><input type="number" step="0.0001" class="form-control rate" name="items[${clientId}][rate]" value="${perCost}" required /></td>
+            <td><select class="form-control form-control-sm vatable" name="items[${clientId}][vatable]"><option value="0">Non-Vatable</option><option value="1">Vatable</option></select></td>
+            <td class="amount">${itemRate}</td>
+            <td><a class="btn-link text-danger btn-sm removeItemButton" title="remove item"><span class="fa-solid fa-trash-can"></span></a></td>
+        </tr>
+    `;
 
             $('#invoiceItems').append(row);
             itemIndex++;
             calculateTotal();
         });
+
 
         $(document).on('click', '.removeItemButton', function() {
             $(this).closest('tr').remove();

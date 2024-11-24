@@ -10,7 +10,9 @@
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
-                        <a class="btn btn-falcon-default btn-sm" href="{{ route('accounts.addInvoice') }}"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">New Invoice</span></a>
+                        @if(auth()->user()->role_id == 8 || auth()->user()->role_id == 7)
+                            <a class="btn btn-falcon-default btn-sm" href="{{ route('accounts.addInvoice') }}"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">New Invoice</span></a>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -40,7 +42,7 @@
                                 <td> {{ $invoice->invoice_number }} </td>
                                 <td> {{ Carbon\Carbon::parse($invoice->year_starting)->format('Y') == Carbon\Carbon::parse($invoice->year_ending)->format('Y') ? Carbon\Carbon::parse($invoice->year_starting)->format('Y') : Carbon\Carbon::parse($invoice->year_starting)->format('Y').'/'.Carbon\Carbon::parse($invoice->year_ending)->format('y') }} </td>
                                 <td> {{ $invoice->clientAccount }} </td>
-                                <td> {{ $invoice->currency_symbol }}{{ number_format($invoice->amount_due, 2) }} </td>
+                                <td> {{ $invoice->currency_symbol }}{{ number_format(str_replace([',', '.00'], '', $invoice->amount_due), 2) }} </td>
                                 <td> {{ \Carbon\Carbon::createFromTimestamp($invoice->date_invoiced)->format('D, d/m/y') }} </td>
                                 <td> {{ \Carbon\Carbon::createFromTimestamp($invoice->due_date)->format('D, d/m/y') }} </td>
                                 <td> {{ $invoice->kra_number }} </td>
@@ -57,21 +59,24 @@
                                             // Calculate the difference in days
                                             $dateDiff = $dateInv->diffInDays($dueDate, false);
                                             $daysToGo = $today->diffInDays($dueDate, false);
-
-                                            $percentage = round(($daysToGo/ abs($dateDiff)) * 100, 2);
+//
+                                            $percentage = $dateDiff == 0 ? round(-1 * 100, 2) : round(($daysToGo/ abs($dateDiff)) * 100, 2);
                                             if ($dueDate->lt($today)) {
-                                                $daysToGo = -$daysToGo;
+                                                $dateDiff == 0 ? $daysToGo : $daysToGo = -$daysToGo;
                                             }
                                     @endphp
 
-                                    {!! $invoice->status == 2 ? '<span class="badge bg-success">Paid </span>' : ($percentage > 75 ? '<span class="badge bg-secondary">'. $daysToGo. ' Days To Payment'. '</span>': ($percentage >= 50 ? '<span class="badge bg-info">'. $daysToGo. ' Days To Payment'. '</span>': ($percentage >= 25 ? '<span class="badge bg-warning">'. $daysToGo. ' Days To Payment'. '</span>': ($percentage >= 0 ? '<span class="badge bg-dark">'. $daysToGo. ' Days To Payment'. '</span>': '<span class="badge bg-danger"> Late By '. $daysToGo. ' Days'. '</span>')))) !!}
+{{--                                    {{ $dateDiff }}--}}
+                                    {!! $invoice->status == 1 ? '<span class="badge bg-success">Paid </span>' : ($invoice->status == 2 ? '<span class="badge bg-info">Partially Paid</span>' : ($percentage > 75 ? '<span class="badge bg-secondary">'. $daysToGo. ' Days To Payment'. '</span>': ($percentage >= 50 ? '<span class="badge bg-info">'. $daysToGo. ' Days To Payment'. '</span>': ($percentage >= 25 ? '<span class="badge bg-warning">'. $daysToGo. ' Days To Payment'. '</span>': ($percentage >= 0 ? '<span class="badge bg-dark">'. $daysToGo. ' Days To Payment'. '</span>': '<span class="badge bg-danger"> Late By '. $daysToGo. ' Days'. '</span>'))))) !!}
                                 </td>
                                 <td nowrap="">
                                     <div class="d-flex align-items-center">
-                                        @if($invoice->posted >= 1)
-                                        <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Invoice Posted"> <span class="fa-solid fa-check-double"></span> </a>
-                                        @else
-                                        <a class="link-primary" title="Post invoice" data-bs-toggle="modal" data-bs-target="#staticBackdrop{{ $invoice->invoice_id }}"><span class="fa-regular fa-share-from-square"></span></a>
+                                        @if(auth()->user()->role_id == 8)
+                                            @if($invoice->posted >= 1)
+                                            <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Invoice Posted"> <span class="fa-solid fa-check-double"></span> </a>
+                                            @else
+                                            <a class="link-primary" title="Post invoice" data-bs-toggle="modal" data-bs-target="#staticBackdrop{{ $invoice->invoice_id }}"><span class="fa-regular fa-share-from-square"></span></a>
+                                        @endif
                                         <div class="modal fade" id="staticBackdrop{{ $invoice->invoice_id }}" data-bs-keyboard="false" data-bs-backdrop="static" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
                                             <div class="modal-dialog modal-lg mt-6" role="document">
                                                 <div class="modal-content border-0">
@@ -108,14 +113,21 @@
                                             </a>
                                             <div class="dropdown-menu dropdown-menu-end border py-0">
                                                 <div class="py-2">
+                                                    <a class="dropdown-item text-primary" href="{{ route('accounts.viewInvoice', $invoice->invoice_id) }}">View Invoice</a>
                                                     @if($invoice->posted >= 1)
-                                                    <a class="dropdown-item text-info" href="{{ route('accounts.viewInvoice', $invoice->invoice_id) }}">View Invoice</a>
-                                                        @if($invoice->type == 1)
-                                                            <a class="dropdown-item text-danger" href="{{ route('accounts.createCreditNote', $invoice->invoice_id) }}">Credit Note</a>
+                                                        @if(auth()->user()->role_id == 8 || auth()->user()->role_id == 7)
+                                                            @if($invoice->type == 1)
+                                                                <a class="dropdown-item text-danger" href="{{ route('accounts.createCreditNote', $invoice->invoice_id) }}">Credit Note</a>
+                                                            @endif
                                                         @endif
                                                     @else
-                                                    <a class="dropdown-item text-dark" href="{{ route('accounts.viewInvoice', $invoice->invoice_id) }}">View Invoice</a>
-                                                        <a class="dropdown-item text-danger" onclick="return confirm('Are you sure you want to delete selected invoice? Invoice Number: {{ $invoice->invoice_number }}')" href="{{ route('accounts.deleteInvoice', $invoice->invoice_id) }}">Nullify Invoice</a>
+                                                        @if(auth()->user()->role_id == 7)
+{{--                                                            <a class="dropdown-item text-dark" href="{{ route('accounts.viewInvoice', $invoice->invoice_id) }}">View Invoice</a>--}}
+                                                            <a class="dropdown-item text-danger" onclick="return confirm('Are you sure you want to delete selected invoice? Invoice Number: {{ $invoice->invoice_number }}')" href="{{ route('accounts.deleteInvoice', $invoice->invoice_id) }}">Nullify Invoice</a>
+                                                        @endif
+                                                        @if(auth()->user()->role_id == 8)
+                                                                <a class="dropdown-item text-info" href="{{ route('accounts.editSalesInvoice', $invoice->invoice_id) }}">Edit Invoice</a>
+                                                        @endif
                                                     @endif
                                                         <a class="dropdown-item text-dark" data-bs-toggle="tooltip" data-bs-placement="left" title="Download Invoice" href="{{ route('accounts.downloadInvoice', $invoice->invoice_id) }}" target="_blank"> Download Invoice </a>
                                                 </div>
@@ -139,7 +151,7 @@
         $(document).ready(function() {
             $('#datatable').DataTable( {
                 order: [ 0, 'asc' ],
-                pageLength: 500
+                pageLength: 50
             } );
         } );
     </script>

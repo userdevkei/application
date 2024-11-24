@@ -10,7 +10,9 @@
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
-                        <a class="btn btn-falcon-default btn-sm" href="{{ route('accounts.addPurchaseInvoice') }}"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">New Voucher</span></a>
+                        @if(auth()->user()->role_id == 9 || auth()->user()->role_id == 7)
+                            <a class="btn btn-falcon-default btn-sm" href="{{ route('accounts.addPurchaseInvoice') }}"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">New Voucher</span></a>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -64,43 +66,45 @@
                                             }
                                     @endphp
 
-                                    {!! $invoice->status == 1 ? '<span class="badge bg-success">Paid </span>' : ($percentage > 75 ? '<span class="badge bg-secondary">'. $daysToGo. ' Days To Payment'. '</span>': ($percentage >= 50 ? '<span class="badge bg-info">'. $daysToGo. ' Days To Payment'. '</span>': ($percentage >= 25 ? '<span class="badge bg-warning">'. $daysToGo. ' Days To Payment'. '</span>': ($percentage >= 0 ? '<span class="badge bg-dark">'. $daysToGo. ' Days To Payment'. '</span>': '<span class="badge bg-danger"> Late By '. $daysToGo. ' Days'. '</span>')))) !!}
+                                    {!! $invoice->status == 1 ? '<span class="badge bg-success">Paid </span>' : ($invoice->status == 2 ? '<span class="badge bg-info"> Partially Paid</span>' : ($percentage > 75 ? '<span class="badge bg-secondary">'. $daysToGo. ' Days To Payment'. '</span>': ($percentage >= 50 ? '<span class="badge bg-info">'. $daysToGo. ' Days To Payment'. '</span>': ($percentage >= 25 ? '<span class="badge bg-warning">'. $daysToGo. ' Days To Payment'. '</span>': ($percentage >= 0 ? '<span class="badge bg-dark">'. $daysToGo. ' Days To Payment'. '</span>': '<span class="badge bg-danger"> Late By '. $daysToGo. ' Days'. '</span>'))))) !!}
                                 </td>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        @if($invoice->posted >= 1)
-                                            <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Voucher Posted"> <span class="fa-solid fa-check-double"></span> </a>
-                                        @else
-                                            <a class="link-primary" title="Post Voucher" data-bs-toggle="modal" data-bs-target="#staticBackdrop{{ $invoice->invoice_id }}"><span class="fa-regular fa-share-from-square"></span></a>
-                                            <div class="modal fade" id="staticBackdrop{{ $invoice->invoice_id }}" data-bs-keyboard="false" data-bs-backdrop="static" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
-                                                <div class="modal-dialog modal-lg mt-6" role="document">
-                                                    <div class="modal-content border-0">
-                                                        <div class="position-absolute top-0 end-0 mt-3 me-3 z-1">
-                                                            <button class="btn-close btn btn-sm btn-circle d-flex flex-center transition-base" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                        </div>
-                                                        <div class="modal-body p-0">
-                                                            <div class="rounded-top-3 bg-body-tertiary py-3 ps-4 pe-6">
-                                                                <h5 class="mb-1" id="staticBackdropLabel">POST INVOICE NUMBER {{ $invoice->voucher_number }}</h5>
+                                        @if(auth()->user()->role_id == 9 || auth()->user()->role_id == 7)
+                                            @if($invoice->posted >= 1)
+                                                <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Voucher Posted"> <span class="fa-solid fa-check-double"></span> </a>
+                                            @else
+                                                <a class="link-primary" title="Post Voucher" data-bs-toggle="modal" data-bs-target="#staticBackdrop{{ $invoice->invoice_id }}"><span class="fa-regular fa-share-from-square"></span></a>
+                                                <div class="modal fade" id="staticBackdrop{{ $invoice->invoice_id }}" data-bs-keyboard="false" data-bs-backdrop="static" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+                                                    <div class="modal-dialog modal-lg mt-6" role="document">
+                                                        <div class="modal-content border-0">
+                                                            <div class="position-absolute top-0 end-0 mt-3 me-3 z-1">
+                                                                <button class="btn-close btn btn-sm btn-circle d-flex flex-center transition-base" data-bs-dismiss="modal" aria-label="Close"></button>
                                                             </div>
-                                                            <div class="p-4">
-                                                                <div class="row">
-                                                                    <form method="POST" action="{{ route('accounts.postPurchaseInvoice', $invoice->purchase_id) }}">
-                                                                        @csrf
-                                                                        <div class="form-floating">
-                                                                            <input type="text" name="kraNumber" class="form-control" placeholder="--">
-                                                                            <label>KRA NUMBER (optional)</label>
-                                                                        </div>
+                                                            <div class="modal-body p-0">
+                                                                <div class="rounded-top-3 bg-body-tertiary py-3 ps-4 pe-6">
+                                                                    <h5 class="mb-1" id="staticBackdropLabel">POST INVOICE NUMBER {{ $invoice->voucher_number }}</h5>
+                                                                </div>
+                                                                <div class="p-4">
+                                                                    <div class="row">
+                                                                        <form method="POST" action="{{ route('accounts.postPurchaseInvoice', $invoice->purchase_id) }}">
+                                                                            @csrf
+                                                                            <div class="form-floating">
+                                                                                <input type="text" name="kraNumber" class="form-control" placeholder="--">
+                                                                                <label>KRA NUMBER (optional)</label>
+                                                                            </div>
 
-                                                                        <div class="d-flex justify-content-center mt-3">
-                                                                            <button type="submit" class="col-8 btn btn-success" onclick="return confirm('Are you sure you want to post selected invoice. Invoice Number: {{ $invoice->voucher_number }}')"> CONFIRM POSTING </button>
-                                                                        </div>
-                                                                    </form>
+                                                                            <div class="d-flex justify-content-center mt-3">
+                                                                                <button type="submit" class="col-8 btn btn-success" onclick="return confirm('Are you sure you want to post selected invoice. Invoice Number: {{ $invoice->voucher_number }}')"> CONFIRM POSTING </button>
+                                                                            </div>
+                                                                        </form>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            @endif
                                         @endif
                                         <div class="dropdown font-sans-serif position-static" >
                                             <a class="link text-600 btn-sm dropdown-toggle btn-reveal" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false">
@@ -108,14 +112,15 @@
                                             </a>
                                             <div class="dropdown-menu dropdown-menu-end border py-0">
                                                 <div class="py-2">
+                                                    <a class="dropdown-item text-info" href="{{ route('accounts.viewPurchaseInvoice', $invoice->purchase_id) }}">View Voucher</a>
                                                     @if($invoice->posted >= 1)
-                                                        <a class="dropdown-item text-info" href="{{ route('accounts.viewPurchaseInvoice', $invoice->purchase_id) }}">View Voucher</a>
                                                         @if($invoice->type == 1)
                                                             <a class="dropdown-item text-danger" href="{{ route('accounts.createCreditNote', $invoice->purchase_id) }}">Credit Note</a>
                                                         @endif
                                                     @else
-                                                        <a class="dropdown-item text-dark" href="{{ route('accounts.viewPurchaseInvoice', $invoice->purchase_id) }}">View Voucher</a>
-                                                        <a class="dropdown-item text-danger" onclick="return confirm('Are you sure you want to delete selected invoice? Invoice Number: {{ $invoice->voucher_number }}')" href="{{ route('accounts.deletePurchaseInvoice', $invoice->purchase_id) }}">Nullify Voucher</a>
+                                                        @if(auth()->user()->role_id == 7)
+                                                            <a class="dropdown-item text-danger" onclick="return confirm('Are you sure you want to delete selected invoice? Invoice Number: {{ $invoice->voucher_number }}')" href="{{ route('accounts.deletePurchaseInvoice', $invoice->purchase_id) }}">Nullify Voucher</a>
+                                                       @endif
                                                     @endif
                                                     <a class="dropdown-item text-dark" data-bs-toggle="tooltip" data-bs-placement="left" title="Download Invoice" href="{{ route('accounts.downloadPurchaseVoucher', $invoice->purchase_id) }}" target="_blank"> Download Invoice </a>
                                                 </div>

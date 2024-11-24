@@ -10,7 +10,9 @@
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
-                        <a class="btn btn-falcon-default btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#staticBackdrop"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">New Currency</span></a>
+                        @if(auth()->user()->role_id == 7)
+                            <a class="btn btn-falcon-default btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#staticBackdrop"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">New Currency</span></a>
+                        @endif
                     </div>
                 </div>
                 <div class="modal fade" id="staticBackdrop" data-bs-keyboard="false" data-bs-backdrop="static" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
@@ -69,7 +71,9 @@
                             <th>CURRENCY SYMBOL</th>
                             <th>PRIORITY</th>
                             <th>STATUS</th>
-                            <th>ACTION</th>
+                            @if(auth()->user()->role_id == 7)
+                                <th>ACTION</th>
+                            @endif
                         </tr>
                         </thead>
                         <tbody>
@@ -80,7 +84,8 @@
                                 <td> {{ $currency->currency_symbol }} </td>
                                 <td> {!! $currency->priority == 1 ? 'PRIMARY CURRENCY' : 'SECONDARY CURRENCY' !!} </td>
                                 <td> {!! $currency->status == 1 ? '<span class="badge text-bg-success"> ACTIVE </span>' : '<span class="badge text-bg-danger"> DISABLED </span>' !!} </td>
-                                <td>
+                                @if(auth()->user()->role_id == 7)
+                                    <td>
                                     <a class="link text-info" data-bs-toggle="modal" title="Edit Account Information" href="#" data-bs-target="#staticBackdropEditAccount-{{ $currency->currency_id }}"><span class="fa-regular fa-pen-to-square"></span></a>
                                     <div class="modal fade" id="staticBackdropEditAccount-{{ $currency->currency_id }}" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
                                         <div class="modal-dialog modal-dialog-centered">
@@ -128,9 +133,9 @@
                                             </div>
                                         </div>
                                     </div>
-
                                     <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Delete Account" onclick="return confirm('Are you sure you want to delete this currency?')" href="{{ route('accounts.deleteCurrency', $currency->currency_id) }}"><span class="fa-regular fa-trash-can"></span></a>
                                 </td>
+                                @endif
                             </tr>
                         @endforeach
                         </tbody>

@@ -167,7 +167,7 @@
             console.log(selectedStation)
             $.ajax({
                 type: 'GET',
-                url: '{{ route('clerk.filterWarehouseBay') }}',
+                url: '{{ route('admin.filterWarehouseBay') }}',
                 data: { selectedStation },
                 success:function (response) {
                     console.log(response)
@@ -230,7 +230,7 @@
         var idNumber = $(this).val();
 
         $.ajax({
-            url: '{{ route('clerk.fetchIdNumber') }}',
+            url: '{{ route('admin.fetchIdNumber') }}',
             method: 'GET',
             data: {idNumber},
             dataType: 'json',

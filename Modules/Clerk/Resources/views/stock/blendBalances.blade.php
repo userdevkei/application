@@ -40,8 +40,8 @@
                                 <td> {{ $balance->garden }} </td>
                                 <td> {{ $balance->grade }} </td>
                                 <td> {{ $balance->blend_number }} </td>
-                                <td> {{ $balance->ex_packages }} </td>
-                                <td> {{ $balance->net_weight }} </td>
+                                <td> {{ $balance->current_packages }} </td>
+                                <td> {{ $balance->current_weight }} </td>
                             </tr>
                         @endforeach
                         </tbody>

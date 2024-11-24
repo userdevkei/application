@@ -11,7 +11,7 @@
                 @if(auth()->user()->role_id == 5)
                     <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                         <div id="table-simple-pagination-replace-element">
-                            <a class="btn btn-falcon-default btn-sm" href="{{ route('clerk.addTCI') }}" type="button"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">New</span></a>
+                            <a class="btn btn-falcon-default btn-sm" href="{{ route('admin.addTCI') }}" type="button"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">New</span></a>
                         </div>
                     </div>
                 @endif

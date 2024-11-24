@@ -188,7 +188,7 @@
                 console.log(selectedStation)
                 $.ajax({
                     type: 'GET',
-                    url: '{{ route('clerk.filterWarehouseBay') }}',
+                    url: '{{ route('admin.filterWarehouseBay') }}',
                     data: {
                         selectedStation
                     },

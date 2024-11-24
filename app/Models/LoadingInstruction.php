@@ -38,42 +38,40 @@ class LoadingInstruction extends Model
         return $this->belongsTo(User::class, 'created_by', 'user_id');
     }
 
-
     public static function newTCI()
-    {
-        $year = date('y');
-        $prefix = 'TCI';
-        $newID = null;
+{
+    $year = date('y'); // Get the last two digits of the current year
+    $prefix = 'TCI' . $year;
+    $newID = null;
 
-        // Start a transaction
-        DB::beginTransaction();
+    // Start a transaction to ensure atomicity
+    DB::beginTransaction();
 
-        try {
-            // Get the maximum existing serialized number for the current year
-           $lastID = self::withTrashed()->where('loading_number', 'like', $prefix . $year . '%')
-//                ->whereNull('deleted_at')
-                ->orderBy('created_at', 'desc')
-                ->orderBy('loading_number', 'desc')
-                ->lockForUpdate() // Lock the rows to prevent concurrent access
-                ->first();
+    try {
+        // Get the maximum numeric part of the loading_number for the current year
+        $lastID = self::withTrashed()
+            ->selectRaw('MAX(CAST(SUBSTRING(loading_number, LENGTH(?) + 1) AS UNSIGNED)) as max_serial', [$prefix]) // Extract numeric part and convert to unsigned integer
+            ->where('loading_number', 'like', $prefix . '%') // Match only those that start with the year prefix
+            ->first();
 
-            $lastSerialNumber = $lastID ? intval(substr($lastID->loading_number, strlen($prefix . $year))) : 0;
+        // Get the last serial number (or start at 1 if no records found)
+        $lastSerialNumber = $lastID && $lastID->max_serial ? $lastID->max_serial : 0;
+        // return $lastSerialNumber;
 
-            // Increment the serialized number
-            $serialNumber = $lastSerialNumber + 1;
+        // Increment the serial number by 1
+        $serialNumber = $lastSerialNumber + 1;
 
-            // Generate the full identifier with leading zeros
-            $newID = $prefix . $year . str_pad($serialNumber, 3, '0', STR_PAD_LEFT);
+        // Generate the new serialized ID with leading zeros to ensure 5 digits
+        $newID = $prefix . str_pad($serialNumber, 5, '0', STR_PAD_LEFT);
 
-            // Commit the transaction
-            DB::commit();
-        } catch (\Exception $e) {
-            // Rollback the transaction if an exception occurs
-            DB::rollback();
-            // Handle or log the exception
-        }
-
-        return $newID;
+        DB::commit();
+    } catch (\Exception $e) {
+        // Rollback if an error occurs
+        DB::rollback();
+        \Log::error('Error generating new TCI:', ['error' => $e->getMessage()]);
+        return null;
     }
 
+    return $newID;
+}
 }

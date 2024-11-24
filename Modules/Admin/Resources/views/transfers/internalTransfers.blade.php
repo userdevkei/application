@@ -154,7 +154,7 @@
 
             $.ajax({
                 type: 'GET',
-                url: '{{ route('clerk.selectStation') }}',
+                url: '{{ route('admin.selectStation') }}',
                 data: { stationId },
                 success:function (response) {
                     console.log(response)
@@ -174,7 +174,7 @@
             var warehouseId = $(this).val();
             $.ajax({
                 type: 'GET',
-                url: '{{ route('clerk.selectClients') }}',
+                url: '{{ route('admin.selectClients') }}',
                 data: { warehouseId },
                 success:function (response) {
                     console.log(response)

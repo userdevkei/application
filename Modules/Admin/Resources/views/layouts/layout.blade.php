@@ -86,7 +86,7 @@
     <!--    End of Main Content-->
     <!-- ===============================================-->
 
-    @include('admin::partials.setting-panel')
+{{--    @include('admin::partials.setting-panel')--}}
 
     <!-- ===============================================-->
     <!--    JavaScripts-->

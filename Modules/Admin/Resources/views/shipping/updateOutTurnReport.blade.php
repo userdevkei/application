@@ -621,7 +621,7 @@
             var idNumber = $(this).val();
 
             $.ajax({
-                url: '{{ route('clerk.fetchIdNumber') }}',
+                url: '{{ route('admin.fetchIdNumber') }}',
                 method: 'GET',
                 data: {idNumber},
                 dataType: 'json',

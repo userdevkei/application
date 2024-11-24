@@ -115,7 +115,7 @@
                                 <td> {{ $loop->iteration }} </td>
                                 <td> {{ $request->service_number }} </td>
                                 <td> {{ $request->request_type == 1 ? 'STOCK POSITION REPORT' : ($request->request_type == 2 ? 'BLEND BALANCE REPORT' : ($request->request_type == 3 ? 'STRAIGHT LINE REPORT' : ($request->request_type == 4 ? 'BLEND PROCESSING REPORT' : ($request->request_type == 5 ? 'TEA TRANSFERS REPORT' : 'TEA COLLECTION REPORT')))) }} </td>
-                                <td> {{ $request->client_name }} </td>
+                                <td> {{ $request->client_name == null ? 'ALL CLIENTS' : $request->client_name }} </td>
                                 <td> {{ $request->request_number == null ? 'NO FILTER' : $request->request_number }} </td>
                                 <td> {{ $request->date_from == null ? 'FULL REPORT' : $request->date_from.' - '.$request->date_to }} </td>
                                 <td> {!! $request->priority == 1 ? '<span class="badge bg-danger"> Very Urgent </span>' : ($request->priority == 2 ? '<span class="badge bg-warning"> Urgent </span>' : '<span class="badge bg-info"> Medium Priority </span>') !!} </td>

@@ -127,4 +127,8 @@ Route::prefix('clerk')->middleware(['auth', 'web', 'userRoles', 'userRole:2,3,4,
     Route::post('store-report-request', [ClerkController::class, 'storeReport'])->name('clerk.storeReport');
     Route::get('approve-report-request/{id}', [ClerkController::class, 'approveReportRequest'])->name('clerk.approveReportRequest');
     Route::get('download-report-request/{id}', [ClerkController::class, 'downloadReportRequest'])->name('clerk.downloadReportRequest');
+
+    Route::post('export-transport-report', [ClerkController::class, 'exportTransportReport'])->name('clerk.exportTransportReport');
+    Route::post('import-dos', [ClerkController::class, 'ImportDOS'])->name('clerk.ImportDOS');
+
 });

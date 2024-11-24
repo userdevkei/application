@@ -10,7 +10,9 @@
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
-                        <a class="btn btn-falcon-default btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#staticBackdrop"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">New Exchange Rate</span></a>
+                        @if(auth()->user()->role_id == 7)
+                            <a class="btn btn-falcon-default btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#staticBackdrop"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">New Exchange Rate</span></a>
+                        @endif
                     </div>
                 </div>
                 <div class="modal fade" id="staticBackdrop" data-bs-keyboard="false" data-bs-backdrop="static" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
@@ -121,8 +123,9 @@
                                             </div>
                                         </div>
                                     </div>
-
-                                    <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Delete Exchange Rate" onclick="return confirm('Are you sure you want to delete this exchange rate?')" href="{{ route('accounts.deleteCurrencyExchangeRate', $forex->forex_id) }}"> <span class="fa-regular fa-trash-can"></span></a>
+                                    @if(auth()->user()->role_id == 7)
+                                        <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Delete Exchange Rate" onclick="return confirm('Are you sure you want to delete this exchange rate?')" href="{{ route('accounts.deleteCurrencyExchangeRate', $forex->forex_id) }}"> <span class="fa-regular fa-trash-can"></span></a>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

@@ -198,7 +198,18 @@
 
                         </table>
                     @endif
-                    @if(!empty($stocks['stock_ins'][0]['blend_processings']))
+                    @php
+                        $blendExists = false;
+                        foreach ($stocks['stock_ins'] as $stockIn) {
+                            if (isset($stockIn['blend_processings']) && !empty($stockIn['blend_processings'])) {
+                                $blendExists = true;
+                                break;
+                            } else {
+                                $blendExists = false;
+                            }
+                        }
+                    @endphp
+                    @if($blendExists)
                         <hr class="mb-4 mt-4">
                         <table  class="table table-striped table-bordered table-sm fs-sm mb-4">
                             <thead>
@@ -230,7 +241,18 @@
                             </tbody>
                         </table>
                     @endif
-                    @if(!empty($stocks['stock_ins'][0]['straight_line_shippings'] ))
+                    @php
+                        $stlExists = false;
+                        foreach ($stocks['stock_ins'] as $stock) {
+                            if (isset($stock['straight_line_shippings']) && !empty($stock['straight_line_shippings'])) {
+                                $stlExists = true;
+                                break;
+                            } else {
+                                $stlExists = false;
+                            }
+                        }
+                    @endphp
+                    @if($stlExists)
                         <hr class="mb-4 mt-4">
                         <table  class="table table-striped table-bordered table-sm fs-sm mb-4">
                             <thead>
@@ -255,13 +277,14 @@
                                         <td> {{ $shipping['shipped_packages'] }} </td>
                                         <td> {{ $shipping['shipped_weight'] }} </td>
                                         <td> {{ \Carbon\Carbon::parse($shipping['created_at'])->format('d/m/y H:i') }} </td>
-                                        <td> {{ \App\Models\ShippingInstruction::where('shipping_id', $shipping['shipping_id'])->first()['status'] > 4 ? 'BLEND BEING PROCESSED' : 'BLEND SHIPPED ON '.\Carbon\Carbon::createFromTimestamp(\App\Models\ShippingInstruction::where('shipping_id', $shipping['shipping_id'])->first()['date_shipped'])->format('D, d/m/y H:i') }} </td>
+                                        <td> {{ \App\Models\ShippingInstruction::where('shipping_id', $shipping['shipping_id'])->first()['status'] > 4 ? 'SI BEING PROCESSED' : 'SI SHIPPED ON '.\Carbon\Carbon::createFromTimestamp(\App\Models\ShippingInstruction::where('shipping_id', $shipping['shipping_id'])->first()['ship_date'])->format('D, d/m/y H:i') }} </td>
                                     </tr>
                                 @endforeach
                             @endforeach
                             </tbody>
                         </table>
                     @endif
+
                     @if(!empty($stocks['stock_ins'][0]['delivery_id']))
                         <hr class="mb-4 mt-4">
                     <table  class="table table-striped table-bordered table-sm fs-sm mb-4">
@@ -301,7 +324,7 @@
                             <td> {{ $stock->driver_name }} </td>
                             <td> {{ $stock->id_number }} </td>
                             <td> {{ \Carbon\Carbon::createFromTimestamp($stock->date_received)->format('D, d/m/y H:i') }} </td>
-                            <?php $user = \App\Models\User::join('user_infos', 'user_infos.user_id', '=', 'users.user_id')->where('username', $stock->username)->first(); ?>
+                            <?php $user = \App\Models\UserInfo::where('user_id', $stock->received_by)->first(); ?>
                             <td> {{ $user->surname.' '.$user->first_name }} </td>
 
                         </tr>
