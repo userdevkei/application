@@ -14,7 +14,7 @@ class InvoiceItem extends Model
     protected $keyType = 'string';
     protected $dates = ['deleted_at'];
 
-    protected $fillable = ['invoice_item_id', 'invoice_id', 'ledger_id', 'quantity', 'unit_price', 'tax_id', 'description', 'status'];
+    protected $fillable = ['invoice_item_id', 'invoice_id', 'ledger_id', 'quantity', 'unit_price', 'tax_id', 'description', 'status', 'updated_at'];
 
     protected static function newFactory()
     {

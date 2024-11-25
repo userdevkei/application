@@ -61,7 +61,7 @@
 
                                                 <div class="form-floating mb-4">
                                                     <input type="number" step="0.01" name="amountReceived" class="form-control" placeholder="--" >
-                                                    <label> AMOUNT RECEIVED</label>
+                                                    <label> AMOUNT PAID</label>
                                                 </div>
 
                                                 <div class="form-floating mb-4">
@@ -71,7 +71,7 @@
 
                                                 <div class="form-floating mb-4">
                                                     <input type="date" name="dateReceived" class="form-control" placeholder="--" required >
-                                                    <label>DATE RECEIVED</label>
+                                                    <label>DATE PAID</label>
                                                 </div>
                                             </div>
 
@@ -166,5 +166,8 @@
             }
         });
     });
+
+    $
+
     });
 </script>

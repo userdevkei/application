@@ -15,8 +15,10 @@ use App\Models\Transporter;
 use App\Services\CustomIds;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Modules\Account\Entities\JournalSchedule;
 use Modules\Account\Entities\Payment;
 use Modules\Account\Entities\PaymentItem;
+use Modules\Account\Entities\SystemJournal;
 use Modules\Account\Entities\TransactionItem;
 use PhpOffice\PhpWord\Settings;
 use PhpOffice\PhpWord\IOFactory;
@@ -81,6 +83,7 @@ class AccountController extends Controller
     public function postInvoice(Request $request, $id)
     {
         Invoice::find($id)->update(['posted' => 1, 'kra_number' => $request->kraNumber]);
+        $this->logger->create();
         return redirect()->back()->with('success', 'Success! Invoice successfully posted');
     }
     public function viewInvoice($id) {
@@ -106,7 +109,54 @@ class AccountController extends Controller
     {
         Invoice::find($id)->delete();
         InvoiceItem::where('invoice_id', $id)->delete();
+        $this->logger->create();
         return redirect()->back()->with('success', 'Success! Invoice successfully deleted');
+    }
+    public function deleteInvoiceItem($id)
+    {
+        DB::beginTransaction();
+        try {
+            $totalDeduction = 0;
+            $taxAmount = 0;
+            $item = InvoiceItem::find($id);
+            $invoice = Invoice::where('invoice_id', $item->invoice_id)->first();
+            $totalAmount = floatval($item->unit_price) * $item->quantity;
+            if ($item->tax_id){
+                $tax = TaxBrackets::where('tax_bracket_id', $item->tax_id)->first();
+                $totalDeduction = floatval($totalAmount * ($tax->tax_rate + 100))/100;
+                $totalTax = floatval($totalAmount * ($tax->tax_rate))/100;
+                $currencyId = ClientAccount::where('client_account_id', $invoice->client_id)->first()->currency_id;
+                $currency = Currency::where('currency_id', $currencyId)->first();
+                if ($currency->priority !== 1){
+                    $invDate = Carbon::createFromTimestamp($invoice->date_invoiced)->format('Y-m-d');
+                    $forex = ForexExchange::where('currency_id', $currencyId)->where('date_active', '<=', $invDate)->orderBy('date_active', 'desc')->first();
+                    $taxAmount = $totalTax * $forex->exchange_rate;
+                }else{
+                    $taxAmount = $totalTax;
+                }
+                $journalTax = Journal::where(['invoice_id' => $invoice->invoice_id, 'account_id' => $item->tax_id])->first();
+                $taxDeductions = floatval($journalTax->debit - $taxAmount);
+                $journalTax->update(['debit' => $taxDeductions]);
+            }else{
+                $totalDeduction = floatval($item->unit_price) * $item->quantity;
+            }
+            $newDueAmount = floatval($invoice->amount_due - $totalDeduction);
+            $invoice->update(['amount_due' => $newDueAmount]);
+            $billedAccount = ClientAccount::where('client_account_id', $invoice->client_id)->first();
+            $journal = Journal::where(['invoice_id' => $item->invoice_id, 'credit' => '0.00', 'account_id' => $billedAccount->chart_id])->first();
+            $journal->update(['debit' => $newDueAmount]);
+            $accountToCredit = ClientAccount::where(['client_account_id' => $item->ledger_id])->first();
+            Journal::where(['invoice_id' => $item->invoice_id, 'debit' => '0.00', 'account_id' => $accountToCredit->chart_id, 'credit' => $totalAmount])->delete();
+            $item->delete();
+            DB::commit();
+            $this->logger->create();
+            return redirect()->back()->with('success', 'Success! Invoice Updated Successfully');
+        } catch (\Exception $e) {
+            // Rollback the transaction if an exception occurs
+            DB::rollback();
+            // Handle or log the exception
+            return redirect()->back()->with('error', 'Oops! '.$e->getMessage());
+        }
     }
     public function downloadInvoice($id)
     {
@@ -228,7 +278,7 @@ class AccountController extends Controller
     }
     public function addInvoice()
     {
-        $accounts = ClientAccount::join('chart_of_accounts', 'chart_of_accounts.chart_id', '=', 'client_accounts.chart_id')
+       $accounts = ClientAccount::join('chart_of_accounts', 'chart_of_accounts.chart_id', '=', 'client_accounts.chart_id')
             ->join('account_sub_categories', 'account_sub_categories.sub_account_id', '=', 'chart_of_accounts.sub_account_id')
             ->join('accounts', 'accounts.account_id', '=', 'account_sub_categories.account_id')
             ->join('currencies', 'currencies.currency_id', '=', 'client_accounts.currency_id')
@@ -269,7 +319,6 @@ class AccountController extends Controller
         return view('account::sales.creditNote')->with(['invoice' => $invoice]);
 
     }
-
     public function editSalesInvoice($id)
     {
         $invoice = Invoice::join('invoice_items', 'invoice_items.invoice_id', '=', 'invoices.invoice_id')
@@ -281,6 +330,8 @@ class AccountController extends Controller
             ->select('client_accounts.client_account_name as account_name', 'invoice_number', 'client.client_account_name as client_name', 'tax_rate', 'quantity', 'unit_price', 'currency_symbol', 'tax_name', 'posted', 'kra_number', 'invoice_items.description', 'ledger_id', 'invoices.invoice_id', 'invoice_items.tax_id', 'financial_year_id', 'date_invoiced', 'due_date', 'si_number', 'container_type', 'destination_id', 'customer_message', 'invoice_item_id', 'client_accounts.client_account_id', 'currencies.currency_id')
             ->where(['invoices.invoice_id' => $id])
             ->whereNull( 'tax_brackets.deleted_at')
+            ->whereNull( 'invoice_items.deleted_at')
+//            ->whereNull( 'tax_brackets.deleted_at')
             ->orderBy('client_accounts.client_account_name', 'ASC')
             ->get();
 
@@ -309,7 +360,6 @@ class AccountController extends Controller
         return view('account::sales.editSalesInvoice')->with(['invoice' => $invoice, 'financialYears' => $financialYears, 'taxes' => $taxes, 'destinations' => $destinations, 'debtors' => collect($debtors), 'items' => collect($items), 'taxRates' => $taxRates, 'invoiceItems' => $invoiceItems]);
 
     }
-
     public function updateSalesInvoice(Request $request, $id)
     {
         if ($request->totalAmount == null){
@@ -319,7 +369,6 @@ class AccountController extends Controller
         DB::beginTransaction();
         try {
         $storedInvoice = Invoice::where('invoice_id', $id)->first();
-
            $invoice = [
                 'date_invoiced' => strtotime($request->invoiceDate),
                 'due_date' =>strtotime($request->dueDate),
@@ -332,35 +381,42 @@ class AccountController extends Controller
             ];
 
         Invoice::where('invoice_id', $id)->update($invoice);
+        $accountToBill = ClientAccount::where('client_account_id', $storedInvoice->client_id)->first();
 
-            $accountToBill = ClientAccount::where('client_account_id', $storedInvoice->client_id)->first();
-
-//
         foreach ($request->creditItems as $keyItem => $invoice){
-           $invoiceItems = [
-                'ledger_id' => $invoice['ledger_id'],
-                'quantity' => $invoice['credit_quantity'],
-                'unit_price' => $invoice['credit_rate'],
-                'tax_id' => $invoice['vat'] == 0 ? null : $invoice['credit_tax'],
-            ];
+            if(InvoiceItem::where(['invoice_item_id' => $keyItem, 'invoice_id' => $id])->exists()){
+                $invoiceItems = [
+                    'ledger_id' => $invoice['ledger_id'],
+                    'quantity' => $invoice['credit_quantity'],
+                    'unit_price' => $invoice['credit_rate'],
+                    'tax_id' => $invoice['vat'] == 0 ? null : $invoice['credit_tax'],
+                ];
 
-            InvoiceItem::where('invoice_item_id', $keyItem)->update($invoiceItems);
+                InvoiceItem::where('invoice_item_id', $keyItem)->update($invoiceItems);
+            }else{
+               $invoiceItem = [
+                    'invoice_item_id' => (new CustomIds())->generateId(),
+                    'ledger_id' => $invoice['ledger_id'],
+                    'invoice_id' => $id,
+                    'quantity' => $invoice['credit_quantity'],
+                    'unit_price' => $invoice['credit_rate'],
+                    'tax_id' => $invoice['vat'] == 0 ? null : $invoice['credit_tax'],
+                ];
+
+                InvoiceItem::create($invoiceItem);
+            }
+
         }
-//
         $journalEntry = [
-//            'account_id' => $accountToBill->account_id,
             'debit' => number_format(floatval($request->totalAmount + $request->totalTaxAmount), 3, '.', ''),
             'credit' => '0.00',
         ];
 
         Journal::where(['invoice_id' => $id, 'account_id' =>$accountToBill->chart_id])->update($journalEntry);
-//
                 if ($request->totalTaxAmount !== null && floatval($request->totalTaxAmount) > 0){
-//                    foreach ($request->creditItems as $keyItem => $taxId){
                         $firstWithCreditTax = array_values(array_filter($request->creditItems, function ($item) {
                             return !empty($item['credit_tax']);
                         }))[0] ?? null;
-//                    }
                     $currencyId = ClientAccount::where('client_account_id', $storedInvoice->client_id)->first()->currency_id;
                     $currency = Currency::where('currency_id', $currencyId)->first();
                     if ($currency->priority !== 1){
@@ -394,11 +450,9 @@ class AccountController extends Controller
             Journal::create($journalEntries);
         }
 
-//        return $journalEntries;
-
                 DB::commit();
                 $this->logger->create();
-                return redirect()->back()/*route('accounts.viewInvoices')*/->with('success', 'Success! Invoice Updated Successfully');
+                return redirect()->route('accounts.viewInvoices')->with('success', 'Success! Invoice Updated Successfully');
             } catch (\Exception $e) {
                 // Rollback the transaction if an exception occurs
                     DB::rollback();
@@ -406,7 +460,6 @@ class AccountController extends Controller
         return redirect()->back()->with('error', 'Oops! '.$e->getMessage());
         }
     }
-
     public function storeCreditNote(Request $request, $id)
     {
         $creditItems = array_filter($request->creditItems, function ($creditItem) {
@@ -461,7 +514,6 @@ class AccountController extends Controller
 
                 InvoiceItem::create($invoiceItems);
             }
-
 
             $accountToBill = ClientAccount::where('client_account_id', $invCreditNote->client_id)->first();
 
@@ -535,7 +587,6 @@ class AccountController extends Controller
         return response()->json($data);
 
     }
-
     public function getIncomeStreams(Request $request)
     {
         $currency = ClientAccount::where('client_account_id', $request->account)->first()->currency_id;
@@ -547,7 +598,6 @@ class AccountController extends Controller
 
         return response()->json($data);
     }
-
     public function getExpenseItems(Request $request)
     {
         $currency = ClientAccount::where('client_account_id', $request->account)->first()->currency_id;
@@ -594,8 +644,6 @@ class AccountController extends Controller
                     'unit_price' => $invoice['rate'],
                     'tax_id' => $invoice['vatable'] == 0 ? null : $request->taxBracket,
                 ];
-
-
 
                 InvoiceItem::create($invoiceItems);
             }
@@ -693,7 +741,6 @@ class AccountController extends Controller
         return view('account::sales.transactions')->with(['transactions' => $transactions, 'accounts' => $accounts, 'years' => $years]);
 
     }
-
     public function downloadPaymentReceipt($id)
     {
         $payment = Transaction::join('client_accounts', 'client_accounts.client_account_id', '=', 'transactions.client_id')
@@ -907,7 +954,6 @@ class AccountController extends Controller
             ->get();;
         return view('account::purchases.index')->with(['invoices' => $invoices]);
     }
-
     public function addPurchaseInvoice()
     {
         $accounts = ClientAccount::join('chart_of_accounts', 'chart_of_accounts.chart_id', '=', 'client_accounts.chart_id')
@@ -1058,7 +1104,6 @@ class AccountController extends Controller
         }
 
     }
-
     public function downloadPurchaseVoucher($id)
     {
         $purchases = Purchase::join('purchase_items', 'purchase_items.purchase_id', '=', 'purchases.purchase_id')
@@ -1162,7 +1207,6 @@ class AccountController extends Controller
         unlink($docPath);
         return response()->download($pdfPath)->deleteFileAfterSend(true);
     }
-
     public function viewPurchaseInvoice($id) {
         $invoices = Purchase::join('purchase_items', 'purchase_items.purchase_id', '=', 'purchases.purchase_id')
             ->join('client_accounts', 'client_accounts.client_account_id', '=', 'purchase_items.ledger_id')
@@ -1186,6 +1230,7 @@ class AccountController extends Controller
     {
         Purchase::find($id)->delete();
         PurchaseItem::where('purchase_id', $id)->delete();
+        $this->logger->create();
         return redirect()->back()->with('success', 'Success! Invoice successfully deleted');
     }
     public function purchaseFYTaxes()
@@ -1404,6 +1449,7 @@ class AccountController extends Controller
 
             ChartOfAccount::create($chart);
 
+
         }
         $this->logger->create();
         return back()->with('success', 'Success! Chart of account created successfully');
@@ -1552,6 +1598,7 @@ class AccountController extends Controller
             'date_active' => $request->date_active
         ];
         ForexExchange::create($exchange);
+        $this->logger->create();
         return back()->with('success', 'Success! Exchange rate added successfully');
     }
     public function updateCurrencyExchangeRate(Request $request, $id)
@@ -1570,11 +1617,13 @@ class AccountController extends Controller
             'date_active' => $request->date_active
         ];
         ForexExchange::find($id)->update($exchange);
+        $this->logger->create();
         return back()->with('success', 'Success! Exchange rate updated successfully');
     }
     public function deleteCurrencyExchangeRate($id)
     {
         ForexExchange::find($id)->delete();
+        $this->logger->create();
         return back()->with('success', 'Success! Exchange rate deleted successfully');
     }
     public function viewCurrencies()
@@ -1712,6 +1761,7 @@ class AccountController extends Controller
             'effect' => $request->effect
         ];
         Tax::create($tax);
+        $this->logger->create();
         return redirect()->back()->with('success', 'Success! Tax Created Successfully');
     }
     public function updateTax(Request $request, $id)
@@ -1723,12 +1773,13 @@ class AccountController extends Controller
             'effect' => $request->effect
         ];
         Tax::find($id)->update($tax);
-
+        $this->logger->create();
         return redirect()->back()->with('success', 'Success! Tax Updated Successfully');
     }
     public function deleteTax($id)
     {
         Tax::find($id)->delete();
+        $this->logger->create();
         return redirect()->back()->with('success', 'Success! Tax deleted successfully');
     }
     public function storeTaxBracket(Request $request)
@@ -1746,6 +1797,7 @@ class AccountController extends Controller
             $taxExists->update(['status' => 2]);
         }
         TaxBrackets::create($tax);
+        $this->logger->create();
         return redirect()->back()->with('success', 'Success! Tax Bracket Created Successfully');
     }
     public function updateTaxBracket(Request $request, $id)
@@ -1761,12 +1813,13 @@ class AccountController extends Controller
         }
 
         TaxBrackets::find($id)->update($tax);
-
+        $this->logger->create();
         return redirect()->back()->with('success', 'Success! Tax Bracket Updated Successfully');
     }
     public function deleteTaxBracket($id)
     {
         TaxBrackets::find($id)->delete();
+        $this->logger->create();
         return redirect()->back()->with('success', 'Success! Tax Bracket deleted successfully');
     }
     public function getSalesFinancialYears()
@@ -2138,7 +2191,6 @@ class AccountController extends Controller
         $statements = $query->get();
         return Excel::download(new ExportVATTaxReport($statements), 'VAT REPORT'.time().'.xlsx', \Maatwebsite\Excel\Excel::XLSX);
     }
-
     public function generateSalesSummary(Request $request, $id){
         $date = FinancialYear::find($id);
         $from = $request->dateFrom == null ? $date->year_starting : $request->dateFrom;
@@ -2323,7 +2375,6 @@ class AccountController extends Controller
                     return response()->download($pdfPath)->deleteFileAfterSend(true);
 
     }
-
     public function generateClientStatement (Request $request){
         list($client, $fyId) = explode(':', base64_decode(string: $request->clientId));
         $data = Db::table('accountstatements')->where(['client_id' => $client, 'financial_year_id' => $fyId])->orderBy('date_invoiced', 'asc');
@@ -2333,56 +2384,6 @@ class AccountController extends Controller
                 : Carbon::parse($year->year_starting)->format('Y').'/'.Carbon::parse($year->year_ending)->format('y');
             return ['fYear' => $formattedYear];
         });
-
-//        if ($request->dateFrom !== null) {
-//            $dateFrom = strtotime($request->dateFrom);
-//
-//            // Calculate the opening balance (sum of debit - credit for transactions before dateFrom)
-//            $openingBalance = DB::table('accountstatements')
-//                ->where('client_id', $client)
-//                ->where('financial_year_id', $fyId)
-//                ->where('date_invoiced', '<', $dateFrom)
-//                ->selectRaw('COALESCE(SUM(debit - credit), 0) as opening_balance')
-//                ->value('opening_balance'); // Ensures 0 if no result is found
-//
-//            // Filter transactions within the given range
-//            $data->where('date_invoiced', '>=', $dateFrom);
-//        }
-//
-//        if ($request->dateTo !== null) {
-//            $data->where('date_invoiced', '<=', strtotime($request->dateTo));
-//        }
-//
-//        // Fetch the transactions as a collection
-//        $collection = $data->get();
-//
-//        // Create the opening balance entry
-//        $opening = [
-//            'date_invoiced' => $dateFrom,
-//            'invoice_number' => 'INV0000000',
-//            'description' => 'CLIENT OPENING BANANCE FOR '.$fy[0]['fYear'],
-//            'debit' => number_format($openingBalance, 2, '.', ''), // Ensure correct formatting
-//            'credit' => '0.00',
-//            'type' => 'OPENING BAL',
-//            'client_id' => null,
-//            'financial_year_id' => null,
-//            'surname' => null,
-//            'first_name' => null,
-//        ];
-//
-//        // Convert opening balance to an array if not already
-//        $opening = (array) $opening; // Ensure $opening is an array
-//
-//        // Convert the collection to an array
-//        $statementsArray = $data->get()->toArray(); // Convert collection to array
-//
-//        // Merge opening and statements arrays
-//        $statements = array_merge([$opening], $statementsArray);
-//
-//        // Convert all elements to arrays
-//        $statements = array_map(function ($item) {
-//            return (array) $item; // Convert stdClass to array
-//        }, $statements);
 
         // Initialize dateFrom as null by default
         $dateFrom = null;
@@ -2512,7 +2513,6 @@ class AccountController extends Controller
         unlink($docPath);
         return response()->download($pdfPath)->deleteFileAfterSend(true);
     }
-
     public function transportDetails()
     {
         $invoices = DB::table('transportreport')
@@ -2523,7 +2523,6 @@ class AccountController extends Controller
 
         return view('account::purchases.transport')->with(['invoices' => $invoices]);
     }
-
     public function exportTransportReport(Request $request)
     {
         $from = $request->from;
@@ -2554,7 +2553,6 @@ class AccountController extends Controller
         return Excel::download(new ExportTeaTransport($orders), 'TRANSPORTERS'.' '.time().'.xlsx', \Maatwebsite\Excel\Excel::XLSX);
 
     }
-
     public function getLedgerFinancialYears()
     {
         $fyIds = Invoice::pluck('financial_year_id')->toArray();
@@ -2621,7 +2619,6 @@ class AccountController extends Controller
         $currency = Currency::find($client->currency_id);
         return view('account::reports.incomes.ledgerStatement')->with(['statements' => $statements, 'fy' => $fy, 'client' => $client, 'currency' => $currency]);
     }
-
     public function generateLedgerStatement(Request $request)
     {
         $from = $request->dateFrom;
@@ -2653,7 +2650,6 @@ class AccountController extends Controller
 
         return Excel::download(new ExportLedgerSummary($statements), 'LEDGER REPORT'.' '.time().'.xlsx', \Maatwebsite\Excel\Excel::XLSX);
     }
-
     public function getExpenseLedgerFinancialYears()
     {
         $fyIds = Invoice::pluck('financial_year_id')->toArray();
@@ -2719,7 +2715,6 @@ class AccountController extends Controller
 
         return view('account::reports.expenses.ledgerStatement')->with(['statements' => $statements, 'fy' => $fy, 'client' => $client, 'currency' => $currency]);
     }
-
     public function generateExpenseLedgerStatement(Request $request)
     {
         $from = $request->dateFrom;
@@ -2751,7 +2746,6 @@ class AccountController extends Controller
 
         return Excel::download(new ExportLedgerSummary($statements), 'LEDGER REPORT'.' '.time().'.xlsx', \Maatwebsite\Excel\Excel::XLSX);
     }
-
     public function generateAllExpenseLedgerStatement(Request $request)
     {
 //        return $request->all();
@@ -2797,7 +2791,6 @@ class AccountController extends Controller
 
         return Excel::download(new ExportAllLedgers($statements), 'LEDGER REPORT'.' '.time().'.xlsx', \Maatwebsite\Excel\Excel::XLSX);
     }
-
     public function generateAllLedgerStatement(Request $request)
     {
 //        return $request->all();
@@ -2843,7 +2836,6 @@ class AccountController extends Controller
 
         return Excel::download(new ExportAllLedgers($statements), 'LEDGER REPORT'.' '.time().'.xlsx', \Maatwebsite\Excel\Excel::XLSX);
     }
-
     public function updateOpeningBalance (Request $request)
     {
         list($client, $year) = explode(':', base64_decode($request->clientId));
@@ -2987,7 +2979,6 @@ class AccountController extends Controller
             }
         }
     }
-
     public function salesInvoiceDistribution($id)
     {
         $invoices = Transaction::join('transaction_items', 'transaction_items.transaction_id', '=', 'transactions.transaction_id')
@@ -3016,7 +3007,6 @@ class AccountController extends Controller
         return view('account::purchases.purchaseVoucherDistribution')->with(['invoices' => $invoices]);
 
     }
-
     public function viewPurchasePayments()
     {
         $data = ClientAccount::join('chart_of_accounts', 'chart_of_accounts.chart_id', '=', 'client_accounts.chart_id')
@@ -3051,7 +3041,6 @@ class AccountController extends Controller
 
         return view('account::purchases.payments')->with(['years' => $years, 'accounts' => $accounts, 'transactions' => $transactions]);
     }
-
     public function storePurchasePaymentInvoice(Request $request)
     {
         $request->validate([
@@ -3139,12 +3128,10 @@ class AccountController extends Controller
             return redirect()->back()->with('error', 'Oops! '.$e->getMessage());
         }
     }
-
     public function viewAgingAnalysis ()
     {
         return view('account::reports.aging.index');
     }
-
     public function viewAgingReport ($id)
     {
         $today = Carbon::today()->format('Y-m-d');
@@ -3291,7 +3278,6 @@ class AccountController extends Controller
         return view('account::reports.aging.agingReport')->with(['data' => $agingData, 'id' => $id]);
 
     }
-
     public function updateTransactionsInvoices()
     {
         // Group transactions by client
@@ -3345,12 +3331,13 @@ class AccountController extends Controller
                         $invoice->update(['status' => 1]); // Fully paid
                     }
                 }
+                $this->logger->create();
             }
+            $this->logger->create();
         }
 
         return redirect()->back()->with('success', 'Success! Invoices updated and transactions processed.');
     }
-
     public function viewAgingInvoices($id)
     {
         list($clientId, $type) = explode(':', base64_decode($id));
@@ -3454,4 +3441,182 @@ class AccountController extends Controller
         return view('account::reports.aging.viewAgingInvoices')->with(['invoices' => $agingData]);
 
     }
+    public function viewSystemJournals()
+    {
+        $journals = SystemJournal::latest()->get();
+        return view('account::journals.index')->with(['journals' => $journals]);
+    }
+    public function storeSystemJournals(Request $request)
+    {
+        $request->validate([
+           'journal' => 'required|regex:/^[a-zA-Z\s]+$/|unique:system_journals,journal_name',
+           'status' => 'required|numeric',
+           'effect' => 'required|numeric',
+        ]);
+
+        $journal = [
+            'journal_id' => (new CustomIds())->generateId(),
+            'journal_name' => $request->journal,
+            'effect' => $request->effect,
+            'status' => $request->status
+        ];
+
+        SystemJournal::create($journal);
+        $this->logger->create();
+        return redirect()->back()->with('success', 'Success!, Journal Created Successfully');
+    }
+    public function updateSystemJournals(Request $request, $id)
+    {
+        $request->validate([
+           'journal' => 'required|regex:/^[a-zA-Z\s]+$/|unique:system_journals,journal_name,'.$id.',journal_id',
+           'status' => 'required|numeric',
+           'effect' => 'required|numeric',
+        ]);
+
+        $journal = [
+            'journal_name' => $request->journal,
+            'effect' => $request->effect,
+            'status' => $request->status
+        ];
+
+        SystemJournal::where('journal_id', $id)->update($journal);
+        $this->logger->create();
+        return redirect()->back()->with('success', 'Success!, Journal Updated Successfully');
+    }
+    public function viewScheduledSystemJournals ()
+    {
+        $charts = ChartOfAccount::where('status', 1)->orderBy('chart_number', 'asc')->get();
+        $journals = SystemJournal::latest()->get();
+        $purchases = Purchase::join('client_accounts', 'client_accounts.client_account_id', '=', 'purchases.client_id')
+            ->join('currencies', 'currencies.currency_id', '=', 'client_accounts.currency_id')
+            ->select('voucher_number', 'client_account_name as clientName', 'amount_due', 'currency_symbol', 'purchase_id')
+            ->orderBy('purchases.created_at', 'desc')
+            ->get();
+        $schedules = JournalSchedule::join('purchases', 'purchases.purchase_id', 'journal_schedules.purchase_id')
+            ->join('client_accounts', 'client_accounts.client_account_id', '=', 'purchases.client_id')
+            ->join('currencies', 'currencies.currency_id', '=', 'client_accounts.currency_id')
+            ->join('system_journals', 'system_journals.journal_id', '=', 'journal_schedules.journal_id')
+            ->leftJoin('scheduled_journals', 'scheduled_journals.journal_schedule_id', '=', 'journal_schedules.journal_schedule_id')
+            ->select('journal_schedules.journal_schedule_id', 'voucher_number', 'client_account_name as clientName', 'journal_name', 'journal_schedules.amount_due', 'monthly_due', 'journal_schedules.status', 'duration', 'currency_symbol', 'system_journals.journal_id', 'effect')
+            ->selectRaw('
+                SUM(CAST(scheduled_journals.amount_settled AS DOUBLE)) AS total_settled,
+                CASE
+                    WHEN effect = 1
+                    THEN journal_schedules.amount_due + SUM(CAST(scheduled_journals.amount_settled AS DOUBLE))
+                    WHEN effect = 2
+                    THEN journal_schedules.amount_due - SUM(CAST(scheduled_journals.amount_settled AS DOUBLE))
+                END AS current_value
+            ')
+            ->groupBy('journal_schedule_id', 'voucher_number', 'client_account_name', 'journal_name', 'journal_schedules.amount_due', 'monthly_due', 'journal_schedules.status', 'duration', 'currency_symbol', 'journal_id', 'effect')
+            ->get();
+        return view('account::journals.scheduledJournals')->with(['journals' => $journals, 'charts' => $charts, 'purchases' => $purchases, 'schedules' => $schedules]);
+    }
+    public function fetchLedgerToScheduleJournal(Request $request)
+    {
+        $data = Purchase::join('client_accounts', 'client_accounts.client_account_id', '=', 'purchases.client_id')
+                    ->where('purchase_id', $request->purchaseId)
+                    ->select('purchases.purchase_id', 'client_account_name as clientName', 'amount_due')
+                    ->first();
+        return response()->json($data);
+    }
+    public function storeScheduledSystemJournals(Request $request)
+    {
+        $request->validate([
+            'purchaseId' => 'required|string',
+            'journalId' => 'required|string',
+            'amountDue' => 'required|string',
+            'installment' => 'required|string',
+            'duration' => 'required|numeric',
+            'status' => 'required|numeric',
+        ]);
+
+        $journal = [
+          'journal_schedule_id' => (new CustomIds())->generateId(),
+            'purchase_id' => $request->purchaseId,
+            'journal_id' => $request->journalId,
+            'duration' => $request->duration,
+            'amount_due' => $request->amountDue,
+            'monthly_due' => $request->installment,
+            'status' => $request->status
+        ];
+        JournalSchedule::create($journal);
+        $this->logger->create();
+        return redirect()->back()->with('success', 'Success! Monthly Journal Scheduled Successfully');
+    }
+    public function updateScheduledSystemJournals(Request $request, $id)
+    {
+        $request->validate([
+            'journalId' => 'required|string',
+            'installment' => 'required|string',
+            'duration' => 'required|numeric',
+            'status' => 'required|numeric',
+        ]);
+
+        $journal = [
+            'journal_id' => $request->journalId,
+            'duration' => $request->duration,
+            'monthly_due' => $request->installment,
+            'status' => $request->status
+        ];
+        JournalSchedule::where('journal_schedule_id', $id)->update($journal);
+        $this->logger->create();
+        return redirect()->back()->with('success', 'Success! Monthly Journal Scheduled Successfully');
+    }
+    public function viewBanks()
+    {
+        $banks = ChartOfAccount::join('client_accounts', 'client_accounts.chart_id', '=', 'chart_of_accounts.chart_id')
+                    ->join('currencies', 'currencies.currency_id', '=', 'client_accounts.currency_id')
+                    ->where(['chart_number' => '1101', 'client_accounts.account_status' => 1])
+                    ->whereNull('client_accounts.deleted_at')
+                    ->orderBy('client_account_number')
+                    ->get();
+        return view('account::banks.index')->with(['banks' => $banks]);
+    }
+    public function viewBankStatement($id)
+    {
+        $statements = Transaction::join('client_accounts', 'client_accounts.client_account_id', '=', 'transactions.client_id')
+            ->where(['account_id' => $id, 'reconciled' => 0])
+            ->orderBy('date_received')
+            ->get();
+        $bank = ClientAccount::join('currencies', 'currencies.currency_id', '=', 'client_accounts.currency_id')->where(['client_account_id' => $id])->first();
+        return view('account::banks.bankStatement')->with(['statements' => $statements, 'bank' => $bank]);
+    }
+    public function viewReconciledBanks()
+    {
+        $banks = ChartOfAccount::join('client_accounts', 'client_accounts.chart_id', '=', 'chart_of_accounts.chart_id')
+                    ->join('currencies', 'currencies.currency_id', '=', 'client_accounts.currency_id')
+                    ->where(['chart_number' => '1101', 'client_accounts.account_status' => 1])
+                    ->whereNull('client_accounts.deleted_at')
+                    ->orderBy('client_account_number')
+                    ->get();
+        return view('account::banks.viewReconciledBanks')->with(['banks' => $banks]);
+    }
+    public function viewReconciledBankStatement($id)
+    {
+        $statements = Transaction::join('client_accounts', 'client_accounts.client_account_id', '=', 'transactions.client_id')
+            ->where(['account_id' => $id, 'reconciled' => 1])
+            ->orderBy('date_received')
+            ->get();
+        $bank = ClientAccount::join('currencies', 'currencies.currency_id', '=', 'client_accounts.currency_id')->where(['client_account_id' => $id])->first();
+        return view('account::banks.viewReconciledBankStatement')->with(['statements' => $statements, 'bank' => $bank]);
+    }
+    public function updateBankDate(Request $request)
+    {
+        // Validate the request
+        $validated = $request->validate([
+            'id' => 'required|exists:transactions,transaction_id',
+            'date' => 'required|date',
+        ]);
+        // Find the record and update the date
+        Transaction::where(['transaction_id' => $request->id])->update(['bank_date' => strtotime($request->date)]);
+        $this->logger->create();
+        return response()->json(['message' => 'Date updated successfully!'], 200);
+    }
+    public function reconcileBankStatement()
+    {
+        Transaction::whereNotNull('bank_date')->where(['reconciled' => 0])->update(['reconciled' => 1, 'status' => 1]);
+        $this->logger->create();
+        return redirect()->route('accounts.viewBanks')->with('success', 'Success! Bank Reconciliation Successful');
+    }
+
 }

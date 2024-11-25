@@ -89,10 +89,22 @@
                       <div class="col ps-0">
                           <hr class="mb-0 navbar-vertical-divider" />
                       </div>
-                      <!-- parent pages--><a class="nav-link" href="#" role="button" data-bs-toggle="" aria-expanded="false">
-                          <div class="d-flex align-items-center"><span class="nav-link-icon"><span class="fa-solid fa-building-columns"></span></span><span class="nav-link-text ps-1">Bank Reconciliation </span>
+                     <!-- parent pages--><a class="nav-link dropdown-indicator" href="#banks" role="button" data-bs-toggle="collapse" aria-expanded="false" aria-controls="banks">
+                          <div class="d-flex align-items-center"><span class="nav-link-icon"><span class="fa-solid fa-book"></span></span><span class="nav-link-text ps-1">Bank Reconciliation</span>
                           </div>
                       </a>
+
+                      <ul class="nav collapse" id="banks">
+                          <!-- parent pages--><li class="nav-item"><a class="nav-link" href="{{ route('accounts.viewBanks') }}" role="button" data-bs-toggle="" aria-expanded="false">
+                                  <div class="d-flex align-items-center"><span class="nav-link-icon"><span class="fa-regular fa-folder-open"></span></span><span class="nav-link-text ps-1">View Banks</span>
+                                  </div>
+                              </a></li>
+                          <!-- parent pages--><li class="nav-item"><a class="nav-link" href="{{ route('accounts.viewReconciledBanks') }}" role="button" data-bs-toggle="" aria-expanded="false">
+                                  <div class="d-flex align-items-center"><span class="nav-link-icon"><span class="fa-solid fa-clock-rotate-left"></span></span><span class="nav-link-text ps-1">Reconciled Statements</span>
+                                  </div>
+                              </a></li>
+                      </ul>
+
                   </li>
                   <li class="nav-item">
                       <div class="col ps-0">
@@ -104,11 +116,11 @@
                       </a>
                       <!-- label-->
                       <ul class="nav collapse" id="journals">
-                          <!-- parent pages--><li class="nav-item"><a class="nav-link" href="#" role="button" data-bs-toggle="" aria-expanded="false">
+                          <!-- parent pages--><li class="nav-item"><a class="nav-link" href="{{ route('accounts.viewSystemJournals') }}" role="button" data-bs-toggle="" aria-expanded="false">
                                   <div class="d-flex align-items-center"><span class="nav-link-icon"><span class="fa-regular fa-folder-open"></span></span><span class="nav-link-text ps-1">View Journals</span>
                                   </div>
                               </a></li>
-                          <!-- parent pages--><li class="nav-item"><a class="nav-link" href="#" role="button" data-bs-toggle="" aria-expanded="false">
+                          <!-- parent pages--><li class="nav-item"><a class="nav-link" href="{{ route('accounts.viewScheduledSystemJournals') }}" role="button" data-bs-toggle="" aria-expanded="false">
                                   <div class="d-flex align-items-center"><span class="nav-link-icon"><span class="fa-solid fa-clock-rotate-left"></span></span><span class="nav-link-text ps-1">Schedule Journal</span>
                                   </div>
                               </a></li>

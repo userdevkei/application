@@ -59,6 +59,7 @@ Route::prefix('account')->middleware(['auth', 'web', 'userRoles', 'userRole:7,8,
     Route::get('view-invoice/{id}', [AccountController::class, 'viewInvoice'])->name('accounts.viewInvoice');
     Route::post('post-created-invoice/{id}', [AccountController::class, 'postInvoice'])->name('accounts.postInvoice');
     Route::get('delete-sale-invoice/{id}', [AccountController::class, 'deleteInvoice'])->name('accounts.deleteInvoice');
+    Route::get('delete-sale-invoice-item/{id}', [AccountController::class, 'deleteInvoiceItem'])->name('accounts.deleteInvoiceItem');
 
     Route::get('financial-year-sales-taxes', [AccountController::class, 'salesFYTaxes'])->name('accounts.salesFYTaxes');
     Route::get('view-yearly-sales-taxes/{id}', [AccountController::class, 'yearlyTaxes'])->name('accounts.yearlyTaxes');
@@ -152,7 +153,21 @@ Route::prefix('account')->middleware(['auth', 'web', 'userRoles', 'userRole:7,8,
     Route::get('view-aging-analysis-report/{id}', [AccountController::class, 'viewAgingReport'])->name('accounts.viewAgingReport');
     Route::get('view-aging-invoices/{id}', [AccountController::class, 'viewAgingInvoices'])->name('accounts.viewAgingInvoices');
 
-
     Route::get('/update-transactions-invoices', [AccountController::class, 'updateTransactionsInvoices'])->name('accounts.updateTransactionsInvoices');
 
+    /*System Journal Routes*/
+    Route::get('/view-system-journals', [AccountController::class, 'viewSystemJournals'])->name('accounts.viewSystemJournals');
+    Route::post('/store-system-journals', [AccountController::class, 'storeSystemJournals'])->name('accounts.storeSystemJournals');
+    Route::post('/update-system-journals/{id}', [AccountController::class, 'updateSystemJournals'])->name('accounts.updateSystemJournals');
+    Route::get('/scheduled-system-journals', [AccountController::class, 'viewScheduledSystemJournals'])->name('accounts.viewScheduledSystemJournals');
+    Route::post('/store-scheduled-system-journals', [AccountController::class, 'storeScheduledSystemJournals'])->name('accounts.storeScheduledSystemJournals');
+    Route::post('/update-scheduled-system-journals/{id}', [AccountController::class, 'updateScheduledSystemJournals'])->name('accounts.updateScheduledSystemJournals');
+    Route::get('/fetch-ledger-to-schedule-system-journals', [AccountController::class, 'fetchLedgerToScheduleJournal'])->name('accounts.fetchLedgerToScheduleJournal');
+
+    Route::get('/view-banks', [AccountController::class, 'viewBanks'])->name('accounts.viewBanks');
+    Route::get('view-bank-statement/{id}', [AccountController::class, 'viewBankStatement'])->name('accounts.viewBankStatement');
+    Route::post('update-bank-date', [AccountController::class, 'updateBankDate'])->name('accounts.updateBankDate');
+    Route::get('reconcile-bank-statement', [AccountController::class, 'reconcileBankStatement'])->name('accounts.reconcileBankStatement');
+    Route::get('/view-reconciled-banks', [AccountController::class, 'viewReconciledBanks'])->name('accounts.viewReconciledBanks');
+    Route::get('view-reconciled-bank-statement/{id}', [AccountController::class, 'viewReconciledBankStatement'])->name('accounts.viewReconciledBankStatement');
 });

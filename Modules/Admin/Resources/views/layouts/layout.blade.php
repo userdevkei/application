@@ -86,7 +86,11 @@
     <!--    End of Main Content-->
     <!-- ===============================================-->
 
+<<<<<<< Updated upstream
 {{--    @include('admin::partials.setting-panel')--}}
+=======
+    {{-- @include('admin::partials.setting-panel') --}}
+>>>>>>> Stashed changes
 
     <!-- ===============================================-->
     <!--    JavaScripts-->

@@ -95,57 +95,113 @@
                             </div>
 
                             <div class="table-responsive mb-3">
-                                <table class="table table-striped credit-note-table table-bordered" id="datatable">
-                                    <thead>
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Item</th>
-                                        <th>Qty</th>
-                                        <th>Rate</th>
-                                        <th>Tax</th>
-                                        <th>Total Invoice</th>
-                                        <th>New Qty</th>
-                                        <th>New Rate</th>
-                                        <th>VAT</th>
-                                        <th>New Total</th>
-                                        <th>New Tax</th>
-                                    </tr>
-                                    </thead>
-                                    <tbody id="creditNoteItems">
+{{--                                <table class="table table-striped credit-note-table table-bordered" id="datatable">--}}
+{{--                                    <thead>--}}
+{{--                                    <tr>--}}
+{{--                                        <th>#</th>--}}
+{{--                                        <th>Item</th>--}}
+{{--                                        <th>Qty</th>--}}
+{{--                                        <th>Rate</th>--}}
+{{--                                        <th>Tax</th>--}}
+{{--                                        <th>Total Invoice</th>--}}
+{{--                                        <th>New Qty</th>--}}
+{{--                                        <th>New Rate</th>--}}
+{{--                                        <th>VAT</th>--}}
+{{--                                        <th>New Total</th>--}}
+{{--                                        <th>New Tax</th>--}}
+{{--                                    </tr>--}}
+{{--                                    </thead>--}}
+{{--                                    <tbody id="creditNoteItems">--}}
 
-                                    <?php $totalInvoice = 0; ?>
-                                        <!-- Load the items from the invoice that can be credited -->
-                                    @foreach($invoice as $item)
-                                        <tr>
-                                            <td>{{ $loop->iteration }}</td>
-                                            <td>
-                                                <select class="form-select form-select-sm ledgerId" name="creditItems[{{ $item->invoice_item_id }}][ledger_id]">
-                                                    @foreach($invoiceItems as $invoiceItem)
-                                                        <option @if($item->ledger_id == $invoiceItem->client_account_id) selected @endif value="{{ $invoiceItem->client_account_id }}">{{ $invoiceItem->client_account_name }}</option>
-                                                    @endforeach
-                                                </select>
-                                            </td>
-                                            <td>{{ $item->quantity }}</td>
-                                            <td>{{ $item->unit_price }}</td>
-                                            <td id>{{ $item->tax_rate == null ? 0 : $item->tax_rate }}%</td>
-                                            <td>{{ number_format(($item->unit_price * $item->quantity) + ($item->unit_price * $item->quantity) * $item->tax_rate/100, 2) }}</td>
-                                            <td style="width: 12vh !important;"><input type="number" value="{{ $item->quantity }}" step="0.001" class="form-control form-control-sm new-qty" name="creditItems[{{ $item->invoice_item_id }}][credit_quantity]" data-rate="{{ $item->unit_price }}" data-tax="{{ $item->tax_rate == null ? 0 : $item->tax_rate }}" placeholder="Enter credit quantity"></td>
-                                            <td style="width: 20vh !important;"><input type="number" step="0.001" class="form-control form-control-sm new-rate" name="creditItems[{{ $item->invoice_item_id }}][credit_rate]" data-quantity="{{ $item->quantity }}" placeholder="Enter new rate" value="{{ $item->unit_price }}"></td>
-                                            <input type="hidden" value="{{ $item->tax_id }}" name="creditItems[{{ $item->invoice_item_id }}][credit_tax]" class="credit-tax">
+{{--                                    <?php $totalInvoice = 0; ?>--}}
+{{--                                        <!-- Load the items from the invoice that can be credited -->--}}
+{{--                                    @foreach($invoice as $item)--}}
+{{--                                        <tr>--}}
+{{--                                            <td>{{ $loop->iteration }}</td>--}}
+{{--                                            <td>--}}
+{{--                                                <select class="form-select form-select-sm ledgerId" name="creditItems[{{ $item->invoice_item_id }}][ledger_id]">--}}
+{{--                                                    @foreach($invoiceItems as $invoiceItem)--}}
+{{--                                                        <option @if($item->ledger_id == $invoiceItem->client_account_id) selected @endif value="{{ $invoiceItem->client_account_id }}">{{ $invoiceItem->client_account_name }}</option>--}}
+{{--                                                    @endforeach--}}
+{{--                                                </select>--}}
+{{--                                            </td>--}}
+{{--                                            <td>{{ $item->quantity }}</td>--}}
+{{--                                            <td>{{ $item->unit_price }}</td>--}}
+{{--                                            <td id>{{ $item->tax_rate == null ? 0 : $item->tax_rate }}%</td>--}}
+{{--                                            <td>{{ number_format(($item->unit_price * $item->quantity) + ($item->unit_price * $item->quantity) * $item->tax_rate/100, 2) }}</td>--}}
+{{--                                            <td style="width: 12vh !important;"><input type="number" value="{{ $item->quantity }}" step="0.001" class="form-control form-control-sm new-qty" name="creditItems[{{ $item->invoice_item_id }}][credit_quantity]" data-rate="{{ $item->unit_price }}" data-tax="{{ $item->tax_rate == null ? 0 : $item->tax_rate }}" placeholder="Enter credit quantity"></td>--}}
+{{--                                            <td style="width: 20vh !important;"><input type="number" step="0.001" class="form-control form-control-sm new-rate" name="creditItems[{{ $item->invoice_item_id }}][credit_rate]" data-quantity="{{ $item->quantity }}" placeholder="Enter new rate" value="{{ $item->unit_price }}"></td>--}}
+{{--                                            <input type="hidden" value="{{ $item->tax_id }}" name="creditItems[{{ $item->invoice_item_id }}][credit_tax]" class="credit-tax">--}}
 {{--                                            <input type="hidden" value="{{ $item->ledger_id }}" name="creditItems[{{ $item->invoice_item_id }}][ledger_id]">--}}
-                                            <td>
-                                                <select id="vatable" class="form-select form-select-sm vat" name="creditItems[{{ $item->invoice_item_id }}][vat]">
-                                                    <option @if($item->tax_rate == null) selected @endif value="0">Non-Vatable</option>
-                                                    <option @if($item->tax_rate !== null) selected @endif value="1" data-tax-id="{{ $taxRates->tax_bracket_id }}">Vatable</option>
-                                                </select>
-                                            </td>
-                                            <td class="new-total">{{ number_format($item->unit_price * $item->quantity) }}</td>
-                                            <td class="new-tax">{{ number_format(($item->unit_price * $item->quantity) * $item->tax_rate/100, 2) }}</td>
-                                                <?php $totalInvoice += ($item->unit_price * $item->quantity) + ($item->unit_price * $item->quantity)* $item->tax_rate/100; ?>
+{{--                                            <td>--}}
+{{--                                                <select id="vatable" class="form-select form-select-sm vat" name="creditItems[{{ $item->invoice_item_id }}][vat]">--}}
+{{--                                                    <option @if($item->tax_rate == null) selected @endif value="0">Non-Vatable</option>--}}
+{{--                                                    <option @if($item->tax_rate !== null) selected @endif value="1" data-tax-id="{{ $taxRates->tax_bracket_id }}">Vatable</option>--}}
+{{--                                                </select>--}}
+{{--                                            </td>--}}
+{{--                                            <td class="new-total">{{ number_format($item->unit_price * $item->quantity) }}</td>--}}
+{{--                                            <td class="new-tax">{{ number_format(($item->unit_price * $item->quantity) * $item->tax_rate/100, 2) }}</td>--}}
+{{--                                                <?php $totalInvoice += ($item->unit_price * $item->quantity) + ($item->unit_price * $item->quantity)* $item->tax_rate/100; ?>--}}
+{{--                                        </tr>--}}
+{{--                                    @endforeach--}}
+{{--                                    </tbody>--}}
+{{--                                </table>--}}
+                                <div class="table-responsive mb-3">
+                                    <table class="table table-striped credit-note-table table-bordered" id="datatable">
+                                        <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Item</th>
+                                            <th>Qty</th>
+                                            <th>Rate</th>
+                                            <th>Tax</th>
+                                            <th>Total Invoice</th>
+                                            <th>New Qty</th>
+                                            <th>New Rate</th>
+                                            <th>VAT</th>
+                                            <th>New Total</th>
+                                            <th>New Tax</th>
+                                            <th>Action</th>
                                         </tr>
-                                    @endforeach
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody id="creditNoteItems">
+
+                                        <?php $totalInvoice = 0; ?>
+                                            <!-- Load the items from the invoice that can be credited -->
+                                        @foreach($invoice as $item)
+                                            <tr>
+                                                <td>{{ $loop->iteration }}</td>
+                                                <td>
+                                                    <select class="form-select form-select-sm ledgerId" name="creditItems[{{ $item->invoice_item_id }}][ledger_id]">
+                                                        @foreach($invoiceItems as $invoiceItem)
+                                                            <option @if($item->ledger_id == $invoiceItem->client_account_id) selected @endif value="{{ $invoiceItem->client_account_id }}">{{ $invoiceItem->client_account_name }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </td>
+                                                <td>{{ $item->quantity }}</td>
+                                                <td>{{ $item->unit_price }}</td>
+                                                <td>{{ $item->tax_rate == null ? 0 : $item->tax_rate }}%</td>
+                                                <td>{{ number_format(($item->unit_price * $item->quantity) + ($item->unit_price * $item->quantity) * $item->tax_rate / 100, 2) }}</td>
+                                                <td style="width: 12vh !important;"><input type="number" value="{{ $item->quantity }}" step="0.001" class="form-control form-control-sm new-qty" name="creditItems[{{ $item->invoice_item_id }}][credit_quantity]" data-rate="{{ $item->unit_price }}" data-tax="{{ $item->tax_rate == null ? 0 : $item->tax_rate }}" placeholder="Enter credit quantity"></td>
+                                                <td style="width: 20vh !important;"><input type="number" step="0.001" class="form-control form-control-sm new-rate" name="creditItems[{{ $item->invoice_item_id }}][credit_rate]" data-quantity="{{ $item->quantity }}" placeholder="Enter new rate" value="{{ $item->unit_price }}"></td>
+                                                <input type="hidden" value="{{ $item->tax_id }}" name="creditItems[{{ $item->invoice_item_id }}][credit_tax]" class="credit-tax">
+                                                <td>
+                                                    <select id="vatable" class="form-select form-select-sm vat" name="creditItems[{{ $item->invoice_item_id }}][vat]">
+                                                        <option @if($item->tax_rate == null) selected @endif value="0">Non-Vatable</option>
+                                                        <option @if($item->tax_rate !== null) selected @endif value="1" data-tax-id="{{ $taxRates->tax_bracket_id }}">Vatable</option>
+                                                    </select>
+                                                </td>
+                                                <td class="new-total">{{ number_format($item->unit_price * $item->quantity, 2) }}</td>
+                                                <td class="new-tax">{{ number_format(($item->unit_price * $item->quantity) * $item->tax_rate / 100, 2) }}</td>
+                                                <td><a class="btn btn-sm text-danger" onclick="return confirm('Are you sure you want to remove this item from the invoice?')" href="{{ route('accounts.deleteInvoiceItem', $item->invoice_item_id) }}"><span class="fa fa-trash-alt"></span> </a></td>
+                                                    <?php $totalInvoice += ($item->unit_price * $item->quantity) + ($item->unit_price * $item->quantity) * $item->tax_rate / 100; ?>
+                                            </tr>
+                                        @endforeach
+                                        </tbody>
+                                    </table>
+                                    <button type="button" class="btn btn-sm btn-success" id="addNewItem">Add New Item</button>
+                                </div>
+
                             </div>
 
                             <div class="row">
@@ -178,10 +234,11 @@
         </div>
     </div>
 @endsection
-{{--<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>--}}
-{{--<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>--}}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 <script>
     $(document).ready(function () {
+        // Function to calculate totals
         function calculateTotals() {
             let totalCreditAmount = 0;
             let totalTaxAmount = 0;
@@ -228,53 +285,57 @@
             $('#totalInvoiceAmount').val(totalCreditAmount.toFixed(2));
         }
 
-        // Trigger the calculation whenever input changes
+        // Event listener to calculate totals
+        // $(document).on('input', '.new-qty, .new-rate, .vat', calculateTotals);
         $(document).on('input', '.new-qty, .new-rate, .vat, .financialYear, .invoiceDate, .dueDate, .siNumber, .containerId, .accountId, .ledgerId', calculateTotals);
+
+        let itemCounter = 1; // Counter for unique item IDs
+
+        $('#addNewItem').on('click', function () {
+            const newRow = `
+        <tr>
+            <td>#</td>
+            <td>
+                <select class="form-select form-select-sm ledgerId" name="creditItems[${itemCounter}][ledger_id]">
+                    @foreach($invoiceItems as $invoiceItem)
+            <option value="{{ $invoiceItem->client_account_id }}">{{ $invoiceItem->client_account_name }}</option>
+                    @endforeach
+            </select>
+        </td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td><input type="number" step="0.001" class="form-control form-control-sm new-qty" name="creditItems[${itemCounter}][credit_quantity]" placeholder="Enter quantity"></td>
+            <td><input type="number" step="0.001" class="form-control form-control-sm new-rate" name="creditItems[${itemCounter}][credit_rate]" placeholder="Enter rate"></td>
+            <input type="hidden" name="creditItems[${itemCounter}][credit_tax]" class="credit-tax" value="0">
+            <td>
+                <select class="form-select form-select-sm vat" name="creditItems[${itemCounter}][vat]">
+                    <option value="0">Non-Vatable</option>
+                    <option value="1" data-tax-id="{{ $taxRates->tax_bracket_id }}">Vatable</option>
+                </select>
+            </td>
+            <td class="new-total">0.00</td>
+            <td class="new-tax">0.00</td>
+            <td><a class="btn btn-sm text-danger remove-item"><span class="fa fa-trash-alt"></span></button></td>
+        </tr>
+    `;
+            $('#creditNoteItems').append(newRow);
+            calculateTotals(); // Recalculate totals after adding a new row
+            itemCounter++; // Increment the counter for the next row
+        });
+
+// Remove row functionality
+        $(document).on('click', '.remove-item', function () {
+            $(this).closest('tr').remove();
+            calculateTotals(); // Recalculate totals after removing a row
+        });
+
+
+        // Remove item functionality
+        $(document).on('click', '.remove-item', function () {
+            $(this).closest('tr').remove();
+            calculateTotals();
+        });
     });
-
-    {{--$(document).ready(function () {--}}
-    {{--    function calculateTotals() {--}}
-    {{--        let totalCreditAmount = 0;--}}
-    {{--        let totalTaxAmount = 0;--}}
-    {{--        let totalInvoice = 0;--}}
-    {{--        const vatTaxRate = @json($taxRates);--}}
-
-    {{--        $('#creditNoteItems tr').each(function() {--}}
-    {{--            const $row = $(this);--}}
-    {{--            const newQty = parseFloat($row.find('.new-qty').val()) || 0;--}}
-    {{--            const newRate = parseFloat($row.find('.new-rate').val()) || 0;--}}
-    {{--            const taxRate = parseFloat($row.find('.new-qty').data('tax'));--}}
-    {{--            const vat = parseInt($row.find('.vat').val());--}}
-
-
-
-    {{--            console.log(parseInt(vatTaxRate['tax_rate']))--}}
-
-
-    {{--            // Calculate new total and tax for this row--}}
-    {{--            const newTotal = newQty * newRate;--}}
-    {{--            const newTax = vat === 0 ? 0 : newTotal * (vatTaxRate['tax_rate'] / 100);--}}
-
-
-    {{--            $row.find('.new-total').text(newTotal.toFixed(2));--}}
-    {{--            $row.find('.new-tax').text(newTax.toFixed(2));--}}
-
-    {{--            // Add to the total credit and tax--}}
-    {{--            totalCreditAmount += newTotal;--}}
-    {{--            totalTaxAmount += newTax;--}}
-    {{--            totalInvoice = totalCreditAmount + totalTaxAmount;--}}
-    {{--        });--}}
-
-    {{--        // Update the total credit and tax display--}}
-    {{--        $('#totalCreditAmountDisplay').text(totalCreditAmount.toFixed(2));--}}
-    {{--        $('#totalTaxAmountDisplay').text(totalTaxAmount.toFixed(2));--}}
-    {{--        $('#totalInvoiceTax').val(totalTaxAmount.toFixed(2));--}}
-    {{--        $('#totalAmountDisplay').text(totalInvoice.toFixed(2));--}}
-    {{--        $('#totalInvoiceAmount').val(totalCreditAmount.toFixed(2));--}}
-    {{--        $('#taxRateId').val(vatTaxRate['tax_id']);--}}
-    {{--    }--}}
-
-    {{--    // Trigger the calculation whenever input changes--}}
-    {{--    $(document).on('input', '.new-qty, .new-rate, .vat', calculateTotals);--}}
-    {{--});--}}
 </script>

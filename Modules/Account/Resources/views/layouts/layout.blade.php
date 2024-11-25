@@ -95,7 +95,7 @@
     <!--    End of Main Content-->
     <!-- ===============================================-->
 
-    @include('account::partials.setting-panel')
+{{--    @include('account::partials.setting-panel')--}}
 
     <!-- ===============================================-->
     <!--    JavaScripts-->

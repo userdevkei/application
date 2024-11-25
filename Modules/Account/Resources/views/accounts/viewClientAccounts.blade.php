@@ -71,7 +71,7 @@
                                                 <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">ACCOUNT LEDGER TYPE</label>
 {{--                                                <select name="type" class="form-select js-choice" required>--}}
                                                 <select class="form-select js-choice" name="type" size="1" data-options='{"removeItemButton":true,"placeholder":true}'>
-                                                    <option disabled selected>-- select ledger type --</option>
+                                                    <option disabled selected value="">-- select ledger type --</option>
                                                     <option value="1">INCOME LEDGER</option>
                                                     <option value="2">EXPENSE LEDGER</option>
                                                     <option value="3">EXPENSE/INCOME LEDGER</option>

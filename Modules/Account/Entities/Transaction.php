@@ -10,7 +10,10 @@ class Transaction extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['transaction_id', 'invoice_number', 'client_id', 'date_received', 'amount_received', 'financial_year_id', 'description', 'user_id', 'transaction_code', 'account_id'];
+    protected $keyType = 'string';
+    protected $primaryKey = 'transaction_id';
+    protected $date = 'deleted_at';
+    protected $fillable = ['transaction_id', 'invoice_number', 'client_id', 'date_received', 'amount_received', 'financial_year_id', 'description', 'user_id', 'transaction_code', 'account_id', 'status', 'reconciled', 'bank_date'];
 
     public static function newPayInvNumber()
     {
