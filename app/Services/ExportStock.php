@@ -31,28 +31,28 @@ class ExportStock implements FromCollection, WithHeadings, ShouldAutoSize, WithS
         // TODO: Implement collection() method.
         foreach ( $this->data as $tea){
 
-            $createdAt = Carbon::parse($tea->created_at);
+            $createdAt = Carbon::parse($tea['created_at']);
             $currentDate = Carbon::now();
             $diffInDays = $createdAt->diffInDays($currentDate);
-            $user = UserInfo::where('user_id', $tea->received_by)->first();
+            $user = UserInfo::where('user_id', $tea['received_by'])->first();
 
             $teas[] = [
-                'CLIENT NAME' => $tea->client_name,
-                'DELIVERY TYPE' => $tea->delivery_type == 1 ? 'DO ENTRY' : 'DIRECT DELIVERY',
-                'DO NUMBER' => $tea->order_number,
-                'GARDEN NAME' => $tea->garden_name,
-                'GRADE' => $tea->grade_name,
-                'INVOICE NUMBER' => $tea->invoice_number,
-                'LOT NUMBER' => $tea->lot_number,
-                'PACKAGES' => $tea->current_stock,
-                'PALLET WEIGHT' => $tea->pallet_weight,
-                'TARE WEIGHT' => $tea->package_tare,
-                'NET WEIGHT' => $tea->current_weight,
-                'GROSS WEIGHT' => $tea->total_weight,
-                'SALE NUMBER' => $tea->sale_number,
-                'DATE RECEIVED' => Carbon::createFromTimestamp( $tea->date_received)->format('D, d-m-Y H:i'),
-                'WAREHOUSE' => $tea->stocked_at,
-                'WAREHOUSE BAY' => $tea->bay_name,
+                'CLIENT NAME' => $tea['client_name'],
+                'DELIVERY TYPE' => $tea['delivery_type'] == 1 ? 'DO ENTRY' : 'DIRECT DELIVERY',
+                'DO NUMBER' => $tea['order_number'],
+                'GARDEN NAME' => $tea['garden_name'],
+                'GRADE' => $tea['grade_name'],
+                'INVOICE NUMBER' => $tea['invoice_number'],
+                'LOT NUMBER' => $tea['lot_number'],
+                'PACKAGES' => $tea['current_stock'],
+                'PALLET WEIGHT' => $tea['pallet_weight'],
+                'TARE WEIGHT' => $tea['package_tare'],
+                'NET WEIGHT' => $tea['current_weight'],
+                'GROSS WEIGHT' => $tea['total_weight'],
+                'SALE NUMBER' => $tea['sale_number'],
+                'DATE RECEIVED' => Carbon::createFromTimestamp( $tea['date_received'])->format('D, d-m-Y H:i'),
+                'WAREHOUSE' => $tea['stocked_at'],
+                'WAREHOUSE BAY' => $tea['bay_name'],
                 'AGING DATE' => $diffInDays . ' days',
                 'RECEIVED BY' => $user->surname.' '.$user->first_name,
             ];

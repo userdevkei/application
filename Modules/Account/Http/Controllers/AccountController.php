@@ -171,6 +171,9 @@ class AccountController extends Controller
             ->join('financial_years', 'financial_years.financial_year_id', '=', 'invoices.financial_year_id')
             ->select('invoices.type', 'invoice_number', 'si_number', 'customer_message', 'client_accounts.client_address', 'client_accounts.kra_pin', 'kra_number', 'port_name', 'container_type', 'date_invoiced', 'due_date', 'invoice_items.quantity', 'invoice_items.unit_price', 'invoice_items.quantity', 'currency_symbol', 'cc.client_account_name as ledgerName', 'client_accounts.client_account_name', 'surname', 'first_name', 'year_starting', 'year_ending', 'tax_rate', 'tax_name', 'cc.currency_id', 'invoice_items.description as hscode', 'inv_reference')
             ->where('invoices.invoice_id', $id)
+            ->whereNull('invoices.deleted_at')
+            ->whereNull('invoice_items.deleted_at')
+            ->whereNull('client_accounts.deleted_at')
             ->orderBy('ledgerName', 'asc')
             ->get();
 

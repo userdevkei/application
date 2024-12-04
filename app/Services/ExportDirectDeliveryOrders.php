@@ -24,20 +24,20 @@ class ExportDirectDeliveryOrders implements FromCollection, WithHeadings, Should
         foreach ( $this->data as $tea){
 
             $teas[] = [
-                'DELIVERY TYPE' => $tea->delivery_type == 1 ? 'DO ENTRY' : 'DIRECT ENTRY',
-                'DO NUMBER' => $tea->order_number,
-                'CLIENT NAME' => $tea->client_name,
-                'TEA TYPE' => $tea->tea_id == 1 ? 'AUCTION TEA' :($tea->tea_id == 2 ? 'PRIVATE TEA' : ($tea->tea_id == 3 ? 'FACTORY TEA' : 'BLEND REMNANT')),
-                'GARDEN NAME' => $tea->garden_name,
-                'GRADE' => $tea->grade_name,
-                'INVOICE NUMBER' => $tea->invoice_number,
-                'PACKAGES' => $tea->total_pallets,
-                'NET WEIGHT' => $tea->net_weight,
-                'PACKAGE' => $tea->package == 1 ? 'PB' : 'PS',
-                'PRODUCER WAREHOUSE' => $tea->warehouse_name.', '.$tea->sub_warehouse_name,
-                'STATUS' => $tea->status == null || $tea->status == 1 ? 'NOT RECEIVED' : 'TEA RECEIVED',
-                'KEYED IN BY' => $tea->first_name.' '.$tea->surname,
-                'DATE KEYED IN' => Carbon::parse($tea->created_at)->format('D, d-m-Y H:i'),
+                'DELIVERY TYPE' => $tea['delivery_type'] == 1 ? 'DO ENTRY' : 'DIRECT ENTRY',
+                'DO NUMBER' => $tea['order_number'],
+                'CLIENT NAME' => $tea['client_name'],
+                'TEA TYPE' => $tea['tea_id'] == 1 ? 'AUCTION TEA' :($tea['tea_id'] == 2 ? 'PRIVATE TEA' : ($tea['tea_id'] == 3 ? 'FACTORY TEA' : 'BLEND REMNANT')),
+                'GARDEN NAME' => $tea['garden_name'],
+                'GRADE' => $tea['grade_name'],
+                'INVOICE NUMBER' => $tea['invoice_number'],
+                'PACKAGES' => $tea['total_pallets'],
+                'NET WEIGHT' => $tea['net_weight'],
+                'PACKAGE' => $tea['package'] == 1 ? 'PB' : 'PS',
+                'PRODUCER WAREHOUSE' => $tea['warehouse_name'].', '.$tea['sub_warehouse_name'],
+                'STATUS' => $tea['status'] == null || $tea['status'] == 1 ? 'NOT RECEIVED' : 'TEA RECEIVED',
+                'KEYED IN BY' => $tea['first_name'].' '.$tea['surname'],
+                'DATE KEYED IN' => Carbon::parse($tea['created_at'])->format('D, d-m-Y H:i'),
             ];
         }
 

@@ -209,4 +209,9 @@ Route::prefix('admin')->middleware(['auth', 'web', 'userRoles', 'userRole:1'])->
     Route::get('download-teas-collection-report/{id}', [AdminController::class, 'collectionStatus'])->name('admin.collectionStatus');
     Route::get('download-transfers-report/{id}', [AdminController::class, 'transferReport'])->name('admin.transferReport');
     Route::post('download-blend-balance-report', [AdminController::class, 'downloadBlendBalances'])->name('admin.downloadBlendBalances');
+
+    Route::get('client-aging-analysis', [AdminController::class, 'stockAgingReport'])->name('admin.stockAgingReport');
+    Route::any('download-aging-analysis', [AdminController::class, 'downloadStockAgingReport'])->name('admin.downloadStockAgingReport');
+    Route::get('client-stock-aging-analysis/{id}', [AdminController::class, 'clientStock'])->name('admin.clientStock');
+    Route::any('download-client-stock-aging-analysis/{id}', [AdminController::class, 'downloadClientStockAgingReport'])->name('admin.downloadClientStockAgingReport');
 });

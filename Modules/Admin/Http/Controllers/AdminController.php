@@ -2,6 +2,8 @@
 
 namespace Modules\Admin\Http\Controllers;
 
+use App\Services\ExportAgingStock;
+use App\Services\ExportClientAgingStock;
 use DateTime;
 use Carbon\Carbon;
 use App\Models\Role;
@@ -1567,7 +1569,12 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $query->where('delivery_orders.created_at', '<=', $to);
         }
 
-        $results = $query->get();
+        $results = $query->get()->map(function ($item) {
+            // Sanitize all fields in each row
+            return collect($item)->map(function ($value) {
+                return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+            });
+        });
 
         if ($request->report == 2){
             return Excel::download(new ExportDeliveryOrders($results), 'TEA COLLECTION '.time().'.xlsx', \Maatwebsite\Excel\Excel::XLSX);
@@ -1601,37 +1608,37 @@ use Modules\Clerk\Entities\WarehouseLocation;
         foreach ($results as $key => $stock){
             $table->addRow();
             $table->addCell(600, ['borderSize' => 1])->addText(++$key, $text, ['space' =>['before' => 70]]);
-            $table->addCell(2000, ['borderSize' => 1])->addText($stock->client_name, $text, ['space' =>['before' => 70]]);
-            $table->addCell(1700, ['borderSize' => 1])->addText($stock->garden_name, $text, ['space' =>['before' => 70]]);
-            $table->addCell(900, ['borderSize' => 1])->addText($stock->grade_name, $text, ['space' =>['before' => 70]]);
-            $table->addCell(1600, ['borderSize' => 1])->addText($stock->invoice_number, $text, ['space' =>['before' => 70]]);
-            $table->addCell(900, ['borderSize' => 1])->addText(number_format($stock->packet, 2), $text, ['space' =>['before' => 70]]);
-            $table->addCell(1800, ['borderSize' => 1])->addText(number_format($stock->weight, 2), $text, ['space' =>['before' => 70]]);
-            $table->addCell(1300, ['borderSize' => 1])->addText($stock->prompt_date, $text, ['space' =>['before' => 70]]);
-            $table->addCell(2200, ['borderSize' => 1])->addText($stock->warehouse_name, $text, ['space' =>['before' => 70]]);
-            $table->addCell(1400, ['borderSize' => 1])->addText($stock->load_status == null ? "No TCI" : ($stock->load_status == 2 ? "Received" : "Under Collection"), $text, ['space' =>['before' => 70]]);
+            $table->addCell(2000, ['borderSize' => 1])->addText($stock['client_name'], $text, ['space' =>['before' => 70]]);
+            $table->addCell(1700, ['borderSize' => 1])->addText($stock['garden_name'], $text, ['space' =>['before' => 70]]);
+            $table->addCell(900, ['borderSize' => 1])->addText($stock['grade_name'], $text, ['space' =>['before' => 70]]);
+            $table->addCell(1600, ['borderSize' => 1])->addText($stock['invoice_number'], $text, ['space' =>['before' => 70]]);
+            $table->addCell(900, ['borderSize' => 1])->addText(number_format($stock['packet'], 2), $text, ['space' =>['before' => 70]]);
+            $table->addCell(1800, ['borderSize' => 1])->addText(number_format($stock['weight'], 2), $text, ['space' =>['before' => 70]]);
+            $table->addCell(1300, ['borderSize' => 1])->addText($stock['prompt_date'], $text, ['space' =>['before' => 70]]);
+            $table->addCell(2200, ['borderSize' => 1])->addText($stock['warehouse_name'], $text, ['space' =>['before' => 70]]);
+            $table->addCell(1400, ['borderSize' => 1])->addText($stock['load_status'] == null ? "No TCI" : ($stock['load_status'] == 2 ? "Received" : "Under Collection"), $text, ['space' =>['before' => 70]]);
 
             $today = Carbon::now()->format('Y/m/d');
-            if ($stock->stock_status == null || $stock->stock_status == 0){
+            if ($stock['stock_status'] == null || $stock['stock_status'] == 0){
                 $date1 = new DateTime($today);
-                $date2 = new DateTime($stock->created_at);
+                $date2 = new DateTime($stock['created_at']);
                 $interval = $date2->diff($date1);
                 $dates = $interval->format('%R%a days');
-            }elseif ($stock->stock_status == 1 && $stock->load_status == 1){
+            }elseif ($stock['stock_status'] == 1 && $stock['load_status'] == 1){
                 $date1 = new DateTime($today);
-                $date3 = new DateTime($stock->created_at);
+                $date3 = new DateTime($stock['created_at']);
                 $interval = $date3->diff($date1);
                 $dates = $interval->format('%R%a days');
             }else{
                 $date1 = new DateTime($today);
-                $date4 = new DateTime(Carbon::createFromTimestamp($stock->date_received));
+                $date4 = new DateTime(Carbon::createFromTimestamp($stock['date_received']));
                 $interval = $date4->diff($date1);
                 $dates = $interval->format('%R%a days');
             }
             $table->addCell(1100, ['borderSize' => 1])->addText($dates, $text, ['space' =>['before' => 70]]);
 
-            $totalPackets += $stock->packet;
-            $totalWeight += $stock->weight;
+            $totalPackets += $stock['packet'];
+            $totalWeight += $stock['weight'];
         }
 
         $table->addRow();
@@ -1658,8 +1665,8 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $clientPackets = 0;
             $clientWeight = 0;
             foreach ($stocks as $stock){
-                $clientWeight += $stock->weight;
-                $clientPackets += $stock->packet;
+                $clientWeight += $stock['weight'];
+                $clientPackets += $stock['packet'];
             }
             $table->addCell(2900, ['gridSpan' => 3, 'borderSize' => 1])->addText(number_format($clientPackets, 2), $text, ['space' =>['before' => 70]]);
             $table->addCell(2000, ['gridSpan' => 2, 'borderSize' => 1])->addText(number_format($clientWeight, 2), $text, ['space' =>['before' => 70]]);
@@ -1691,8 +1698,8 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $stationPackets = 0;
             $stationWeight = 0;
             foreach ($stocks as $stock){
-                $stationWeight += $stock->weight;
-                $stationPackets += $stock->packet;
+                $stationWeight += $stock['weight'];
+                $stationPackets += $stock['packet'];
             }
 
             $table->addCell(2900, ['gridSpan' => 3, 'borderSize' => 1])->addText(number_format($stationPackets, 2), $text, ['space' =>['before' => 70]]);
@@ -1821,7 +1828,7 @@ use Modules\Clerk\Entities\WarehouseLocation;
             ->where('current_stock', '>', 0)
             ->where('current_weight', '>', 0)
             ->select('client_name', 'garden_name', 'grade_name', 'invoice_number', 'sale_number', 'loading_number', 'warehouse_name', 'date_received', 'order_number', 'current_stock', 'current_weight', 'package_tare', 'pallet_weight',
-            'created_at', 'received_by', 'delivery_orders.delivery_type', 'lot_number', 'prompt_date', 'total_weight', 'stocked_at', 'bay_name')
+            'created_at', 'received_by', 'delivery_type', 'lot_number', 'prompt_date', 'total_weight', 'stocked_at', 'bay_name')
             ->orderBy('sortOrder', 'desc')
             ->orderBy('client_name', 'asc')
             ->orderBy('stocked_at', 'asc');
@@ -1849,14 +1856,19 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $query->where('date_received', '<=', $toTimestamp);
         }
 
-        $results = $query->get();
+        $results = $query->get()->map(function ($item) {
+            // Sanitize all fields in each row
+            return collect($item)->map(function ($value) {
+                return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+            });
+        });
 
         if ($request->report == 2){
             return Excel::download(new ExportStock($results), 'STOCK '.time().'.xlsx', \Maatwebsite\Excel\Excel::XLSX);
         }
 
-        ini_set('memory_limit', '10000M');
-        ini_set('max_execution_time', 30000);
+        ini_set('memory_limit', '10000000M');
+        ini_set('max_execution_time', 3000000);
 
 
         $date = date('D, d-m-Y, h:i:s');
@@ -1875,8 +1887,7 @@ use Modules\Clerk\Entities\WarehouseLocation;
         foreach ($results->groupBy('client_name') as $clientName => $result) {
             $table->addRow();
             $table->addCell(null, ['gridSpan' => 15])->addText('CLIENT NAME : '.$clientName, $headers);
-            // $table->addRow();
-            // $table->addCell(13250, ['gridSpan' => 15])->addText('');
+        
             $table->addRow();
             $table->addCell(600, ['borderSize' => 1])->addText('#', $headers, ['space' => ['before' => 100]]);
             $table->addCell(1200, ['borderSize' => 1])->addText('Invoice #', $headers, ['space' => ['before' => 100]]);
@@ -1906,28 +1917,28 @@ use Modules\Clerk\Entities\WarehouseLocation;
             foreach ($result as $key => $stock){
                 $table->addRow();
                 $table->addCell(600, ['borderSize' => 1])->addText(++$key, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1200, ['borderSize' => 1])->addText($stock->invoice_number, $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
-                $table->addCell(1300, ['borderSize' => 1])->addText($stock->garden_name, $text, ['space' => ['before' => 100]]);
-                $table->addCell(750, ['borderSize' => 1])->addText($stock->grade_name, $text, ['space' => ['before' => 100]]);
-                $table->addCell(800, ['borderSize' => 1])->addText($stock->sale_number, $text, ['space' => ['before' => 100]]);
+                $table->addCell(1200, ['borderSize' => 1])->addText($stock['invoice_number'], $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
+                $table->addCell(1300, ['borderSize' => 1])->addText($stock['garden_name'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(750, ['borderSize' => 1])->addText($stock['grade_name'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(800, ['borderSize' => 1])->addText($stock['sale_number'], $text, ['space' => ['before' => 100]]);
 
-                $table->addCell(700, ['borderSize' => 1])->addText(number_format(floatval($stock->current_weight/$stock->current_stock), 2), $text, ['space' => ['before' => 100]]);
-                $table->addCell(600, ['borderSize' => 1])->addText(number_format(floatval($stock->package_tare * $stock->current_stock + $stock->pallet_weight), 2), $text, ['space' => ['before' => 100]]);
-                $table->addCell(600, ['borderSize' => 1])->addText(number_format(floatval($stock->current_weight/$stock->current_stock), 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(700, ['borderSize' => 1])->addText(number_format(floatval($stock['current_weight']/$stock['current_stock']), 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(600, ['borderSize' => 1])->addText(number_format(floatval($stock['package_tare'] * $stock['current_stock'] + $stock['pallet_weight']), 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(600, ['borderSize' => 1])->addText(number_format(floatval($stock['current_weight']/$stock['current_stock']), 2), $text, ['space' => ['before' => 100]]);
 
-                $table->addCell(1000, ['borderSize' => 1])->addText(number_format($stock->current_stock, 2), $text, ['space' => ['before' => 100]]);
-                $table->addCell(1200, ['borderSize' => 1])->addText(number_format($stock->current_weight, 2), $text, ['space' => ['before' => 100]]);
-                $table->addCell(1200, ['borderSize' => 1])->addText(number_format(floatval($stock->current_weight + ($stock->package_tare * $stock->current_stock + $stock->pallet_weight)), 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText(number_format($stock['current_stock'], 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(1200, ['borderSize' => 1])->addText(number_format($stock['current_weight'], 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(1200, ['borderSize' => 1])->addText(number_format(floatval($stock['current_weight'] + ($stock['package_tare'] * $stock['current_stock'] + $stock['pallet_weight'])), 2), $text, ['space' => ['before' => 100]]);
 
-                $table->addCell(900, ['borderSize' => 1])->addText($stock->loading_number, $text, ['space' => ['before' => 100]]);
-                $table->addCell(900, ['borderSize' => 1])->addText($stock->order_number, $text, ['space' => ['before' => 100]]);
+                $table->addCell(900, ['borderSize' => 1])->addText($stock['loading_number'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(900, ['borderSize' => 1])->addText($stock['order_number'], $text, ['space' => ['before' => 100]]);
 
-                $table->addCell(900, ['borderSize' => 1])->addText(\Carbon\Carbon::createFromTimestamp($stock->date_received)->format('d-m-y'), $text, ['space' => ['before' => 100]]);
-                $table->addCell(2000, ['borderSize' => 1])->addText($stock->warehouse_name, $text, ['space' => ['before' => 100]]);
+                $table->addCell(900, ['borderSize' => 1])->addText(\Carbon\Carbon::createFromTimestamp($stock['date_received'])->format('d-m-y'), $text, ['space' => ['before' => 100]]);
+                $table->addCell(2000, ['borderSize' => 1])->addText($stock['warehouse_name'], $text, ['space' => ['before' => 100]]);
 
-                $totalPackets += $stock->current_stock;
-                $totalWeight += $stock->current_weight;
-                $grossWeight += floatval($stock->current_weight + ($stock->package_tare * $stock->current_stock + $stock->pallet_weight));
+                $totalPackets += $stock['current_stock'];
+                $totalWeight += $stock['current_weight'];
+                $grossWeight += floatval($stock['current_weight'] + ($stock['package_tare'] * $stock['current_stock'] + $stock['pallet_weight']));
             }
 
             $table->addRow();
@@ -1948,12 +1959,9 @@ use Modules\Clerk\Entities\WarehouseLocation;
         $stock->setComplexBlock('{table}', $table);
         $stock->setValue('date', $date);
         $stock->setValue('by', $by);
-        $stock->setValue('client_name', $results[0]->client_name);
+        $stock->setValue('client_name', $results[0]['client_name']);
         $docPath = 'Files/TempFiles/STOCK '.time().'.docx';
         $stock->saveAs($docPath);
-
-        //  return response()->download($docPath)->deleteFileAfterSend();
-
 
         $phpWord = IOFactory::load($docPath);
         $contents = \PhpOffice\PhpWord\IOFactory::load($docPath);
@@ -2891,19 +2899,31 @@ use Modules\Clerk\Entities\WarehouseLocation;
     }
     public function downloadSIDocument($id)
     {
-        $shippings = ShippingInstruction::join('clients', 'clients.client_id', '=', 'shipping_instructions.client_id')
-            ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'shipping_instructions.clearing_agent')
-            ->join('destinations', 'destinations.destination_id', '=', 'shipping_instructions.destination_id')
-            ->leftJoin('transporters', 'transporters.transporter_id', '=', 'shipping_instructions.transporter_id')
-            ->leftJoin('drivers', 'drivers.driver_id', '=', 'shipping_instructions.driver_id')
-            ->leftJoin('shipments', 'shipments.shipping_id', '=', 'shipping_instructions.shipping_id')
-            ->leftJoin('delivery_orders', 'delivery_orders.delivery_id', 'shipments.delivery_id')
-            ->leftJoin('gardens', 'gardens.garden_id', 'delivery_orders.garden_id')
-            ->leftJoin('grades', 'grades.grade_id', 'delivery_orders.grade_id')
-            ->select('sale_number', 'garden_name', 'grade_name', 'invoice_number', 'registration', 'driver_name', 'drivers.phone', 'shipping_instructions', 'ship_date' ,'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'transporter_name',)
-            ->where('shipping_instructions.shipping_id', $id)
-            ->whereNull('shipments.deleted_at')
-            ->get();
+       $shippings = ShippingInstruction::join('clients', 'clients.client_id', '=', 'shipping_instructions.client_id')
+                ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'shipping_instructions.clearing_agent')
+                ->join('destinations', 'destinations.destination_id', '=', 'shipping_instructions.destination_id')
+                ->leftJoin('transporters', 'transporters.transporter_id', '=', 'shipping_instructions.transporter_id')
+                ->leftJoin('drivers', 'drivers.driver_id', '=', 'shipping_instructions.driver_id')
+                ->leftJoin('shipments', 'shipments.shipping_id', '=', 'shipping_instructions.shipping_id')
+                ->leftJoin('delivery_orders', 'delivery_orders.delivery_id', 'shipments.delivery_id')
+                ->leftJoin('gardens', 'gardens.garden_id', 'delivery_orders.garden_id')
+                ->leftJoin('grades', 'grades.grade_id', 'delivery_orders.grade_id')
+                ->select(
+                    'sale_number', 'garden_name', 'grade_name', 'invoice_number', 'registration',
+                    'driver_name', 'drivers.phone', 'shipping_instructions', 'ship_date',
+                    'client_name', 'shipping_number', 'vessel_name', 'port_name',
+                    'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark',
+                    'container_number', 'agent_name', 'transporter_name', 'seal_number'
+                )
+                ->where('shipping_instructions.shipping_id', $id)
+                ->whereNull('shipments.deleted_at')
+                ->get()
+                ->map(function ($item) {
+                    // Sanitize all fields in each row
+                    return collect($item)->map(function ($value) {
+                        return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+                    });
+                });
 
         $domPdfPath = base_path('vendor/dompdf/dompdf');
         \PhpOffice\PhpWord\Settings::setPdfRendererPath($domPdfPath);
@@ -2929,15 +2949,15 @@ use Modules\Clerk\Entities\WarehouseLocation;
         foreach ($shippings as $key => $tea){
             $table->addRow();
             $table->addCell(1000, ['borderSize' => 1])->addText(++$key, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(2500, ['borderSize' => 1])->addText($tea->garden_name, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(2000, ['borderSize' => 1])->addText($tea->grade_name, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(2000, ['borderSize' => 1])->addText($tea->sale_number, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(2500, ['borderSize' => 1])->addText($tea->invoice_number, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(2000, ['borderSize' => 1])->addText(number_format($tea->shipped_packages, 2), $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(2000, ['borderSize' => 1])->addText(number_format(str_replace([',', '.00'], '', $tea->shipped_weight), 2), $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(2500, ['borderSize' => 1])->addText($tea['garden_name'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(2000, ['borderSize' => 1])->addText($tea['grade_name'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(2000, ['borderSize' => 1])->addText($tea['sale_number'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(2500, ['borderSize' => 1])->addText($tea['invoice_number'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(2000, ['borderSize' => 1])->addText(number_format($tea['shipped_packages'], 2), $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(2000, ['borderSize' => 1])->addText(number_format(str_replace([',', '.00'], '', $tea['shipped_weight']), 2), $text, ['space' => ['before' => 100, 'after' => 100]]);
 
-            $totalPackages += floatval($tea->shipped_packages);
-            $totalWeight += floatval(str_replace([',', '.00'], '', $tea->shipped_weight));
+            $totalPackages += floatval($tea['shipped_packages']);
+            $totalWeight += floatval(str_replace([',', '.00'], '', $tea['shipped_weight']));
         }
 
 
@@ -2952,24 +2972,24 @@ use Modules\Clerk\Entities\WarehouseLocation;
 
         $stock = new TemplateProcessor(storage_path('shipping_instructions_template.docx'));
         $stock->setComplexBlock('{table}', $table);
-        $stock->setValue('client', $sheet->client_name);
-        $stock->setValue('blendNumber', $sheet->shipping_number);
-        $stock->setValue('port', $sheet->port_name);
-        $stock->setValue('consignee', $sheet->consignee);
-        $stock->setValue('shipMark', $sheet->shipping_mark);
-        $stock->setValue('vesselName', $sheet->vessel_name);
-        $stock->setValue('sealNumber', $sheet->seal_number);
-        $stock->setValue('container', $sheet->container_number);
+        $stock->setValue('client', $sheet['client_name']);
+        $stock->setValue('blendNumber', $sheet['shipping_number']);
+        $stock->setValue('port', $sheet['port_name']);
+        $stock->setValue('consignee', $sheet['consignee']);
+        $stock->setValue('shipMark', $sheet['shipping_mark']);
+        $stock->setValue('vesselName', $sheet['vessel_name']);
+        $stock->setValue('sealNumber', $sheet['seal_number']);
+        $stock->setValue('container', $sheet['container_number']);
         $stock->setValue('shippedPac', number_format($totalPackages, 2));
         $stock->setValue('shippedWei', number_format($totalWeight, 2));
         $stock->setValue('staffName', $staffName);
-        $stock->setValue('agent', $sheet->agent_name);
-        $stock->setValue('transporter', $sheet->transporter_name);
-        $stock->setValue('registration', $sheet->registration);
-        $stock->setValue('driverName', $sheet->driver_name);
-        $stock->setValue('driverPhone', $sheet->phone);
-        $stock->setValue('details', $sheet->shipping_instructions);
-        $stock->setValue('status', $sheet->ship_date == null ? 'Being Processed' : 'Shipped On :'. Carbon::createFromTimestamp($sheet->ship_date)->toDateString());
+        $stock->setValue('agent', $sheet['agent_name']);
+        $stock->setValue('transporter', $sheet['transporter_name']);
+        $stock->setValue('registration', $sheet['registration']);
+        $stock->setValue('driverName', $sheet['driver_name']);
+        $stock->setValue('driverPhone', $sheet['phone']);
+        $stock->setValue('details', $sheet['shipping_instructions']);
+        $stock->setValue('status', $sheet['ship_date'] == null ? 'Being Processed' : 'Shipped On :'. Carbon::createFromTimestamp($sheet['ship_date'])->toDateString());
         $stock->setValue('date', $date);
         $stock->setValue('by', $staffName);
         $docPath = 'Files/TempFiles/SI '.time().'.docx';
@@ -2998,14 +3018,20 @@ use Modules\Clerk\Entities\WarehouseLocation;
                     ->on('currentstock.delivery_id', '=', 'shipments.delivery_id');
             })
             ->where('shipping_instructions.shipping_id', $id)
-            ->get();
+            ->get()
+            ->map(function ($item) {
+                // Sanitize all fields in each row
+                return collect($item)->map(function ($value) {
+                    return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+                });
+            });
 
         $totalWeight = 0;
         $totalPackages = 0;
 
         foreach ($shippings as $key => $tea){
-            $totalPackages += floatval($tea->shipped_packages);
-            $totalWeight += floatval($tea->shipped_weight);
+            $totalPackages += floatval($tea['shipped_packages']);
+            $totalWeight += floatval($tea['shipped_weight']);
         }
 
         $sheet = $shippings[0];
@@ -3013,24 +3039,24 @@ use Modules\Clerk\Entities\WarehouseLocation;
         $date = Carbon::now()->format('D, d-m-Y H:i:s');
 
         $stock = new TemplateProcessor(storage_path('driver_clearance_template.docx'));
-        $stock->setValue('blendNumber', $sheet->shipping_number);
-        $stock->setValue('port', $sheet->port_name);
-        $stock->setValue('consignee', $sheet->consignee);
-        $stock->setValue('shipMark', $sheet->shipping_mark);
-        $stock->setValue('vesselName', $sheet->vessel_name);
-        $stock->setValue('sealNumber', $sheet->seal_number);
-        $stock->setValue('container', $sheet->container_number);
+        $stock->setValue('blendNumber', $sheet['shipping_number']);
+        $stock->setValue('port', $sheet['port_name']);
+        $stock->setValue('consignee', $sheet['consignee']);
+        $stock->setValue('shipMark', $sheet['shipping_mark']);
+        $stock->setValue('vesselName', $sheet['vessel_name']);
+        $stock->setValue('sealNumber', $sheet['seal_number']);
+        $stock->setValue('container', $sheet['container_number']);
         $stock->setValue('shippedPac', number_format($totalPackages, 2));
         $stock->setValue('shippedWei', number_format($totalWeight, 2));
         $stock->setValue('staffName', $staffName);
-        $stock->setValue('agent', $sheet->agent_name);
-        $stock->setValue('transporter', $sheet->transporter_name);
-        $stock->setValue('registration', $sheet->registration);
-        $stock->setValue('driverName', $sheet->driver_name);
-        $stock->setValue('driverPhone', $sheet->phone);
+        $stock->setValue('agent', $sheet['agent_name']);
+        $stock->setValue('transporter', $sheet['transporter_name']);
+        $stock->setValue('registration', $sheet['registration']);
+        $stock->setValue('driverName', $sheet['driver_name']);
+        $stock->setValue('driverPhone', $sheet['phone']);
         $stock->setValue('date', $date);
         $stock->setValue('by', $staffName);
-        $stock->setValue('loading', $sheet->loading_type == 1 ? 'LOOSE LOADING' : 'PALLETIZED LOADING');
+        $stock->setValue('loading', $sheet['loading_type'] == 1 ? 'LOOSE LOADING' : 'PALLETIZED LOADING');
         $docPath = 'Files/TempFiles/DRIVER CLEARANCE '.time().'.docx';
         $stock->saveAs($docPath);
 
@@ -3311,7 +3337,6 @@ use Modules\Clerk\Entities\WarehouseLocation;
                 }
             }
 
-
             if ($driver){
 
                 $blendSheet->update([
@@ -3508,23 +3533,26 @@ use Modules\Clerk\Entities\WarehouseLocation;
     }
     public function downloadBlendSheet($id)
     {
+        $sanitizedSheet = DB::table('blend_sheets')
+                ->join('clients', 'clients.client_id', '=', 'blend_sheets.client_id')
+                ->join('destinations', 'destinations.destination_id', '=', 'blend_sheets.destination_id')
+                ->leftJoin('blend_teas', 'blend_teas.blend_id', '=', 'blend_sheets.blend_id')
+                ->leftJoin('drivers', 'drivers.driver_id', '=', 'blend_sheets.driver_id')
+                ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'blend_sheets.agent_id')
+                ->leftJoin('transporters', 'transporters.transporter_id', '=', 'blend_sheets.transporter_id')
+                ->leftJoin('stations', 'stations.station_id', '=', 'blend_sheets.station_id')
+                ->select('blend_sheets.blend_id', 'blend_sheets.client_id', 'client_name', 'clients.phone as cPhone', 'email', 'blend_number', 'vessel_name', 'blend_sheets.destination_id', 'port_name', 'shipping_mark', 'consignee', 'contract', 'grade', 'garden', 'standard_details', 'blend_date', 'blend_sheets.status', 'container_size', 'clients.address', 'package_type', 'registration', 'transporter_name', 'transporters.transporter_id', 'driver_name', 'drivers.phone as driver_phone', 'container_tare', 'blend_shipped', 'agent_name', 'seal_number', 'escort', 'output_packages', 'output_weight', 'blend_sheets.packet_tare', 'blend_sheets.agent_id', 'id_number', 'stations.station_id', 'stations.station_name')
+                ->selectRaw('SUM(blend_teas.blended_packages) as input_packages')
+                ->selectRaw('SUM(blend_teas.blended_weight) as input_weight')
+                ->groupBy('blend_sheets.blend_id', 'blend_sheets.client_id', 'client_name', 'clients.phone', 'email', 'blend_number', 'vessel_name', 'blend_sheets.destination_id', 'port_name', 'shipping_mark', 'consignee', 'contract', 'grade', 'garden', 'standard_details', 'blend_date', 'blend_sheets.status', 'container_size', 'clients.address', 'package_type', 'registration', 'transporter_name', 'driver_name', 'driver_phone', 'container_tare', 'blend_shipped', 'agent_name', 'seal_number', 'escort', 'output_packages', 'output_weight', 'packet_tare', 'agent_id', 'transporter_id', 'id_number', 'station_id', 'station_name')
+                ->whereNull('blend_teas.deleted_at')
+                ->where('blend_sheets.blend_id', $id)
+                ->latest('blend_sheets.created_at')
+                ->first();
 
-        $sheet = DB::table('blend_sheets')
-            ->join('clients', 'clients.client_id', '=', 'blend_sheets.client_id')
-            ->join('destinations', 'destinations.destination_id', '=', 'blend_sheets.destination_id')
-            ->leftJoin('blend_teas', 'blend_teas.blend_id', '=', 'blend_sheets.blend_id')
-            ->leftJoin('drivers', 'drivers.driver_id', '=', 'blend_sheets.driver_id')
-            ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'blend_sheets.agent_id')
-            ->leftJoin('transporters', 'transporters.transporter_id', '=', 'blend_sheets.transporter_id')
-            ->leftJoin('stations', 'stations.station_id', '=', 'blend_sheets.station_id')
-            ->select('blend_sheets.blend_id', 'blend_sheets.client_id', 'client_name', 'clients.phone as cPhone', 'email', 'blend_number', 'vessel_name', 'blend_sheets.destination_id', 'port_name', 'shipping_mark', 'consignee', 'contract', 'grade', 'garden', 'standard_details', 'blend_date', 'blend_sheets.status', 'container_size', 'clients.address', 'package_type', 'registration', 'transporter_name', 'transporters.transporter_id', 'driver_name', 'drivers.phone as driver_phone', 'container_tare', 'blend_shipped', 'agent_name', 'seal_number', 'escort', 'output_packages', 'output_weight', 'blend_sheets.packet_tare', 'blend_sheets.agent_id', 'id_number', 'stations.station_id', 'stations.station_name')
-            ->selectRaw('SUM(blend_teas.blended_packages) as input_packages')
-            ->selectRaw('SUM(blend_teas.blended_weight) as input_weight')
-            ->groupBy('blend_sheets.blend_id', 'blend_sheets.client_id', 'client_name', 'clients.phone', 'email', 'blend_number', 'vessel_name', 'blend_sheets.destination_id', 'port_name', 'shipping_mark', 'consignee', 'contract', 'grade', 'garden', 'standard_details', 'blend_date', 'blend_sheets.status', 'container_size', 'clients.address', 'package_type', 'registration', 'transporter_name', 'driver_name', 'driver_phone', 'container_tare', 'blend_shipped', 'agent_name', 'seal_number', 'escort', 'output_packages', 'output_weight', 'packet_tare', 'agent_id', 'transporter_id', 'id_number', 'station_id', 'station_name')
-            ->whereNull('blend_teas.deleted_at')
-            ->where('blend_sheets.blend_id', $id)
-            ->latest('blend_sheets.created_at')
-            ->first();
+            $sheet = collect($sanitizedSheet)->map(function ($value) {
+                return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+            });
 
         $teas = BlendTea::leftJoin('delivery_orders', 'delivery_orders.delivery_id', '=', 'blend_teas.delivery_id')
             ->leftJoin('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
@@ -3540,7 +3568,13 @@ use Modules\Clerk\Entities\WarehouseLocation;
             ->select('blended_id', 'blend_teas.blended_packages', 'blend_teas.blended_weight', 'blend_teas.status', 'garden_name', 'grade_name', 'grade', 'garden', 'loading_number', 'sale_number', 'prompt_date', 'invoice_number', 'blend_number', 'blend_date')
             ->where('blend_teas.blend_id', $id)
             ->orderBy('blend_teas.created_at', 'desc')
-            ->get();
+            ->get()
+            ->map(function ($item) {
+                // Sanitize all fields in each row
+                return collect($item)->map(function ($value) {
+                    return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+                });
+            });
 
         $date = Carbon::now()->format('D, d-m-Y H:i:s');
 
@@ -3550,8 +3584,8 @@ use Modules\Clerk\Entities\WarehouseLocation;
 
         foreach ($blendBalances as $bal){
             if($bal->type == 1){
-                $balPacks += $bal->ex_packages;
-                $balWeight += $bal->net_weight;
+                $balPacks += $bal['ex_packages'];
+                $balWeight += $bal['net_weight'];
             }
         }
 
@@ -3579,18 +3613,18 @@ use Modules\Clerk\Entities\WarehouseLocation;
         foreach ($teas as $key => $tea){
             $table->addRow();
             $table->addCell(1000, ['borderSize' => 1])->addText(++$key, $header, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(2500, ['borderSize' => 1])->addText($tea->garden_name == null ? $tea->garden : $tea->garden_name, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(2000, ['borderSize' => 1])->addText($tea->grade_name == null ? $tea->grade : $tea->grade_name, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(2000, ['borderSize' => 1])->addText($tea->invoice_number == null ? $tea->blend_number : $tea->invoice_number, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(2000, ['borderSize' => 1])->addText($tea->blended_packages, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(2000, ['borderSize' => 1])->addText($tea->blended_weight, $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(2500, ['borderSize' => 1])->addText($tea['garden_name'] == null ? $tea['garden'] : $tea['garden_name'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(2000, ['borderSize' => 1])->addText($tea['grade_name'] == null ? $tea['grade'] : $tea['grade_name'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(2000, ['borderSize' => 1])->addText($tea['invoice_number'] == null ? $tea['blend_number'] : $tea['invoice_number'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(2000, ['borderSize' => 1])->addText($tea['blended_packages'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(2000, ['borderSize' => 1])->addText($tea['blended_weight'], $text, ['space' => ['before' => 100, 'after' => 100]]);
             $table->addCell(2000, ['borderSize' => 1])->addText('In Stock', $text, ['space' => ['before' => 100, 'after' => 100]]);
 
-            $totalPackages += floatval($tea->blended_packages);
-            $totalWeight += floatval($tea->blended_weight);
+            $totalPackages += floatval($tea['blended_packages']);
+            $totalWeight += floatval($tea['blended_weight']);
         }
 
-        $blendBal = $totalWeight - $sheet->output_weight;
+        $blendBal = $totalWeight - $sheet['output_weight'];
 
         $table->addRow();
         $table->addCell(7500, ['gridSpan' => 4])->addText();
@@ -3603,34 +3637,35 @@ use Modules\Clerk\Entities\WarehouseLocation;
 
         $stock = new TemplateProcessor(storage_path('blend_remnants_stock_template.docx'));
         $stock->setComplexBlock('{table}', $table);
-        $stock->setValue('client', $sheet->client_name);
-        $stock->setValue('blendNumber', $sheet->blend_number);
-        $stock->setValue('port', $sheet->port_name);
-        $stock->setValue('contract', $sheet->contract);
-        $stock->setValue('consignee', $sheet->consignee);
-        $stock->setValue('shipMark', $sheet->shipping_mark);
-        $stock->setValue('vesselName', $sheet->vessel_name);
-        $stock->setValue('sealNumber', $sheet->seal_number);
+        $stock->setValue('client', $sheet['client_name']);
+        $stock->setValue('blendNumber', $sheet['blend_number']);
+        $stock->setValue('port', $sheet['port_name']);
+        $stock->setValue('contract', $sheet['contract']);
+        $stock->setValue('consignee', $sheet['consignee']);
+        $stock->setValue('shipMark', $sheet['shipping_mark']);
+        $stock->setValue('vesselName', $sheet['vessel_name']);
+        $stock->setValue('sealNumber', $sheet['seal_number']);
         $stock->setValue('container', implode(', ', $containers));
-        $stock->setValue('grade', $sheet->grade);
-        $stock->setValue('garden', $sheet->garden);
+        $stock->setValue('grade', $sheet['grade']);
+        $stock->setValue('garden', $sheet['garden']);
         $stock->setValue('inputPac', number_format($totalPackages, 2));
         $stock->setValue('inputWei', number_format($totalWeight, 2));
-        $stock->setValue('shippedPac', number_format($sheet->output_packages, 2));
-        $stock->setValue('shippedWei', number_format($sheet->output_weight, 2));
+        $stock->setValue('shippedPac', number_format($sheet['output_packages'], 2));
+        $stock->setValue('shippedWei', number_format($sheet['output_weight'], 2));
         $stock->setValue('blendBal', number_format($balWeight, 2));
         $stock->setValue('blendBalPac', number_format($balPacks, 2));
+        $stock->setValue('staffName', $staffName);
         $stock->setValue('by', $staffName);
-        $stock->setValue('agent', $sheet->agent_name);
-        $stock->setValue('transporter', $sheet->transporter_name);
-        $stock->setValue('registration', $sheet->registration);
-        $stock->setValue('driverName', $sheet->driver_name);
-        $stock->setValue('driverPhone', $sheet->driver_phone);
-        $stock->setValue('station', $sheet->station_name);
-        $stock->setValue('details', $sheet->standard_details);
+        $stock->setValue('agent', $sheet['agent_name']);
+        $stock->setValue('transporter', $sheet['transporter_name']);
+        $stock->setValue('registration', $sheet['registration']);
+        $stock->setValue('driverName', $sheet['driver_name']);
+        $stock->setValue('driverPhone', $sheet['driver_phone']);
+        $stock->setValue('station', $sheet['station_name']);
+        $stock->setValue('details', $sheet['standard_details']);
         $stock->setValue('date', $date);
-        $stock->setValue('blendDate', $sheet->blend_date == null ? '' : $sheet->blend_date);
-        $stock->setValue('status', $sheet->blend_shipped == null ? 'Being Processed' : 'SHIPPED '. Carbon::createFromTimestamp($sheet->blend_shipped)->format('D, d-m-Y H:i'));
+        $stock->setValue('blendDate', $sheet['blend_date'] == null ? '' : $sheet['blend_date']);
+        $stock->setValue('status', $sheet['blend_shipped'] == null ? 'Being Processed' : 'SHIPPED '. Carbon::createFromTimestamp($sheet['blend_shipped'])->format('D, d-m-Y H:i'));
         $docPath = 'Files/TempFiles/BLEND '.time().'.docx';
         $stock->saveAs($docPath);
         // return response()->download($docPath)->deleteFileAfterSend(true);
@@ -3644,7 +3679,7 @@ use Modules\Clerk\Entities\WarehouseLocation;
     }
     public function downloadBlendDriverClearance($id)
     {
-        $sheet = DB::table('blend_sheets')
+        $blendSheet = DB::table('blend_sheets')
             ->join('clients', 'clients.client_id', '=', 'blend_sheets.client_id')
             ->join('destinations', 'destinations.destination_id', '=', 'blend_sheets.destination_id')
             ->leftJoin('blend_teas', 'blend_teas.blend_id', '=', 'blend_sheets.blend_id')
@@ -3661,36 +3696,40 @@ use Modules\Clerk\Entities\WarehouseLocation;
             ->latest('blend_sheets.created_at')
             ->first();
 
+        $sheet = collect($blendSheet)->map(function ($value) {
+                return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+            });
+
         $totalWeight = 0;
         $totalPackages = 0;
 
 
-        $totalPackages = floatval($sheet->output_packages);
-        $totalWeight = floatval($sheet->output_weight);
+        $totalPackages = floatval($sheet['output_packages']);
+        $totalWeight = floatval($sheet['output_weight']);
 
         $containers = ShipmentContainer::where('blend_id', $id)->pluck('container_number')->toArray();
         $staffName = auth()->user()->user->surname.' '.auth()->user()->user->first_name;
         $date = Carbon::now()->format('D, d-m-Y H:i:s');
 
         $stock = new TemplateProcessor(storage_path('driver_clearance_template.docx'));
-        $stock->setValue('blendNumber', $sheet->blend_number);
-        $stock->setValue('port', $sheet->port_name);
-        $stock->setValue('consignee', $sheet->consignee);
-        $stock->setValue('shipMark', $sheet->shipping_mark);
-        $stock->setValue('vesselName', $sheet->vessel_name);
-        $stock->setValue('sealNumber', $sheet->seal_number);
+        $stock->setValue('blendNumber', $sheet['blend_number']);
+        $stock->setValue('port', $sheet['port_name']);
+        $stock->setValue('consignee', $sheet['consignee']);
+        $stock->setValue('shipMark', $sheet['shipping_mark']);
+        $stock->setValue('vesselName', $sheet['vessel_name']);
+        $stock->setValue('sealNumber', $sheet['seal_number']);
         $stock->setValue('container', implode(', ', $containers));
         $stock->setValue('shippedPac', number_format($totalPackages, 2));
         $stock->setValue('shippedWei', number_format($totalWeight, 2));
         $stock->setValue('staffName', $staffName);
-        $stock->setValue('agent', $sheet->agent_name);
-        $stock->setValue('transporter', $sheet->transporter_name);
-        $stock->setValue('registration', $sheet->registration);
-        $stock->setValue('driverName', $sheet->driver_name);
-        $stock->setValue('driverPhone', $sheet->driver_phone);
+        $stock->setValue('agent', $sheet['agent_name']);
+        $stock->setValue('transporter', $sheet['transporter_name']);
+        $stock->setValue('registration', $sheet['registration']);
+        $stock->setValue('driverName', $sheet['driver_name']);
+        $stock->setValue('driverPhone', $sheet['driver_phone']);
         $stock->setValue('date', $date);
         $stock->setValue('by', $staffName);
-        $stock->setValue('loading', $sheet->package_type == 1 ? 'PALLETIZED CARDBOARD' : ($sheet->package_type == 2 ? 'PALLETIZED SLIPSHEET' : ($sheet->package_type == 3 ? 'PALLETIZED WOODEN' : 'LOOSE LOADING')));
+        $stock->setValue('loading', $sheet['package_type'] == 1 ? 'PALLETIZED CARDBOARD' : ($sheet['package_type'] == 2 ? 'PALLETIZED SLIPSHEET' : ($sheet['package_type'] == 3 ? 'PALLETIZED WOODEN' : 'LOOSE LOADING')));
         $docPath = 'Files/TempFiles/DRIVER CLEARANCE '.time().'.docx';
         $stock->saveAs($docPath);
         // return response()->download($docPath)->deleteFileAfterSend(true);
@@ -3825,12 +3864,20 @@ use Modules\Clerk\Entities\WarehouseLocation;
             ->join('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
             ->join('stock_ins', 'stock_ins.delivery_id', '=', 'delivery_orders.delivery_id')
             ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'delivery_orders.warehouse_id')
+            ->leftJoin('sub_warehouses', 'sub_warehouses.sub_warehouse_id', '=', 'delivery_orders.sub_warehouse_id')
             ->join('stations', 'stations.station_id', '=', 'stock_ins.station_id')
             ->join('warehouse_bays', 'warehouse_bays.bay_id', '=', 'stock_ins.warehouse_bay')
             ->join('user_infos', 'user_infos.user_id', '=', 'delivery_orders.created_by')
-            ->select('order_number', 'clients.client_name', 'delivery_orders.tea_id', 'warehouses.warehouse_name', 'stock_ins.total_pallets', 'stock_ins.net_weight', 'delivery_orders.status as order_status', 'gardens.garden_name', 'grades.grade_name', 'delivery_orders.invoice_number', 'stations.station_name', 'warehouse_bays.bay_name', 'total_weight', 'date_received', 'delivery_orders.created_at', 'delivery_orders.status', 'first_name', 'surname', 'delivery_orders.created_by')
+            ->select('delivery_orders.delivery_type', 'package', 'sub_warehouse_name', 'order_number', 'clients.client_name', 'delivery_orders.tea_id', 'warehouses.warehouse_name', 'stock_ins.total_pallets', 'stock_ins.net_weight', 'delivery_orders.status as order_status', 'gardens.garden_name', 'grades.grade_name', 'delivery_orders.invoice_number', 'stations.station_name', 'warehouse_bays.bay_name', 'total_weight', 'date_received', 'delivery_orders.created_at', 'delivery_orders.status', 'first_name', 'surname', 'delivery_orders.created_by')
             ->where(['delivery_orders.delivery_type' => 2, 'delivery_orders.order_number' => $doNumber])
-            ->get();
+            ->get()
+            ->map(function ($item) {
+                // Sanitize all fields in each row
+                return collect($item)->map(function ($value) {
+                    return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+                });
+            });
+
 
         if ($type == 2){
             return Excel::download(new ExportDirectDeliveryOrders($orders), 'DIRECT DELIVERY TALLY '.time().'.xlsx', \Maatwebsite\Excel\Excel::XLSX);
@@ -3846,7 +3893,7 @@ use Modules\Clerk\Entities\WarehouseLocation;
         \PhpOffice\PhpWord\Settings::setPdfRendererPath($domPdfPath);
         \PhpOffice\PhpWord\Settings::setPdfRendererName('DomPDF');
 
-        $table = new Table(['unit' => \PhpOffice\PhpWord\SimpleType\TblWidth::TWIP, 'width' => 1400 * 1400, 'align' => 'center']);
+        $table = new Table(['unit' => \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT, 'width' => 100 * 50, 'align' => JC::CENTER]);
 
         $header = ['size' => 8, 'name' => 'Cambria', 'space' => ['before' => 100, 'after' => 100], 'bold' => true];
         $text = ['size' => 8, 'name' => 'Cambria', 'space' => ['before' => 100, 'after' => 100], 'bold' => false];
@@ -3854,30 +3901,30 @@ use Modules\Clerk\Entities\WarehouseLocation;
         $table->addRow();
         $table->addCell(600, ['borderSize' => 1])->addText('#', $header, ['space' => ['before' => 100, 'after' => 100]]);
         $table->addCell(1500, ['borderSize' => 1])->addText('Garden', $header, ['space' => ['before' => 100, 'after' => 100]]);
-        $table->addCell(1500, ['borderSize' => 1])->addText('Grade', $header, ['space' => ['before' => 100, 'after' => 100]]);
+        $table->addCell(1200, ['borderSize' => 1])->addText('Grade', $header, ['space' => ['before' => 100, 'after' => 100]]);
         $table->addCell(1500, ['borderSize' => 1])->addText('INV Number', $header, ['space' => ['before' => 100, 'after' => 100]]);
         $table->addCell(1200, ['borderSize' => 1])->addText('Gross Weight', $header, ['space' => ['before' => 100, 'after' => 100]]);
-        $table->addCell(2000, ['borderSize' => 1])->addText('Packages', $header, ['space' => ['before' => 100, 'after' => 100]]);
-        $table->addCell(2000, ['borderSize' => 1])->addText('Net Weight', $header, ['space' => ['before' => 100, 'after' => 100]]);
-        $table->addCell(2000, ['borderSize' => 1])->addText('Date Rec\'d', $header, ['space' => ['before' => 100, 'after' => 100]]);
+        $table->addCell(1000, ['borderSize' => 1])->addText('Packages', $header, ['space' => ['before' => 100, 'after' => 100]]);
+        $table->addCell(1200, ['borderSize' => 1])->addText('Net Weight', $header, ['space' => ['before' => 100, 'after' => 100]]);
+        $table->addCell(1300, ['borderSize' => 1])->addText('Date Rec\'d', $header, ['space' => ['before' => 100, 'after' => 100]]);
         $table->addCell(2000, ['borderSize' => 1])->addText('Producer Whs', $header, ['space' => ['before' => 100, 'after' => 100]]);
         $sn = 0;
         $totalGrossWeight = $totalNetWeight = $totalPackages = 0;
         foreach ($orders as $order){
             $table->addRow();
             $table->addCell(600, ['borderSize' => 1])->addText(++$sn, $text, ['space' => ['before' => 50, 'after' => 50]]);
-            $table->addCell(1500, ['borderSize' => 1])->addText($order->garden_name, $text, ['space' => ['before' => 50, 'after' => 50]]);
-            $table->addCell(1500, ['borderSize' => 1])->addText($order->grade_name, $text, ['space' => ['before' => 50, 'after' => 50]]);
-            $table->addCell(1500, ['borderSize' => 1])->addText($order->invoice_number, $text, ['space' => ['before' => 50, 'after' => 50]]);
-            $table->addCell(1200, ['borderSize' => 1])->addText($order->total_weight, $text, ['space' => ['before' => 50, 'after' => 50]]);
-            $table->addCell(1500, ['borderSize' => 1])->addText($order->total_pallets, $text, ['space' => ['before' => 50, 'after' => 50]]);
-            $table->addCell(1500, ['borderSize' => 1])->addText($order->net_weight, $text, ['space' => ['before' => 50, 'after' => 50]]);
-            $table->addCell(1500, ['borderSize' => 1])->addText(Carbon::createFromTimestamp($order->date_received)->format('d-m-Y h:i'), $text, ['space' => ['before' => 50, 'after' => 50]]);
-            $table->addCell(2500, ['borderSize' => 1])->addText($order->warehouse_name, $text, ['space' => ['before' => 50, 'after' => 50]]);
+            $table->addCell(1500, ['borderSize' => 1])->addText($order['garden_name'], $text, ['space' => ['before' => 50, 'after' => 50]]);
+            $table->addCell(1200, ['borderSize' => 1])->addText($order['grade_name'], $text, ['space' => ['before' => 50, 'after' => 50]]);
+            $table->addCell(1500, ['borderSize' => 1])->addText($order['invoice_number'], $text, ['space' => ['before' => 50, 'after' => 50]]);
+            $table->addCell(1200, ['borderSize' => 1])->addText($order['total_weight'], $text, ['space' => ['before' => 50, 'after' => 50]]);
+            $table->addCell(1000, ['borderSize' => 1])->addText($order['total_pallets'], $text, ['space' => ['before' => 50, 'after' => 50]]);
+            $table->addCell(1200, ['borderSize' => 1])->addText($order['net_weight'], $text, ['space' => ['before' => 50, 'after' => 50]]);
+            $table->addCell(1300, ['borderSize' => 1])->addText(Carbon::createFromTimestamp($order['date_received'])->format('d-m-Y h:i'), $text, ['space' => ['before' => 50, 'after' => 50]]);
+            $table->addCell(2000, ['borderSize' => 1])->addText($order['warehouse_name'], $text, ['space' => ['before' => 50, 'after' => 50]]);
 
-            $totalGrossWeight += $order->total_weight;
-            $totalNetWeight += $order->net_weight;
-            $totalPackages += $order->total_pallets;
+            $totalGrossWeight += $order['total_weight'];
+            $totalNetWeight += $order['net_weight'];
+            $totalPackages += $order['total_pallets'];
         }
 
         $table->addRow();
@@ -3889,10 +3936,10 @@ use Modules\Clerk\Entities\WarehouseLocation;
 
         $stock = new TemplateProcessor(storage_path('direct_delivery_report.docx'));
         $stock->setComplexBlock('table', $table);
-        $stock->setValue('client', $detail->client_name);
-        $stock->setValue('station', $detail->station_name);
-        $stock->setValue('bay', $detail->bay_name);
-        $stock->setValue('orderNumber', $detail->order_number);
+        $stock->setValue('client', $detail['client_name']);
+        $stock->setValue('station', $detail['station_name']);
+        $stock->setValue('bay', $detail['bay_name']);
+        $stock->setValue('orderNumber', $detail['order_number']);
         $stock->setValue('by', $staffName);
         $stock->setValue('prepared', $by);
         $stock->setValue('date', $date);
@@ -3943,11 +3990,17 @@ use Modules\Clerk\Entities\WarehouseLocation;
             ->leftJoin('transporters', 'transporters.transporter_id', '=', 'transfers.transporter_id')
             ->leftJoin('drivers', 'drivers.driver_id', '=', 'transfers.driver_id')
             ->select('stations.station_name', 'transfers.created_by as prepared_by', 'stations.station_id', 'delivery_orders.grade_id', 'delivery_orders.garden_id', 'delivery_orders.client_id', 'clients.client_name', 'gardens.garden_name', 'grades.grade_name', 'transfers.requested_palettes', 'transfers.requested_weight', 'destination', 'destination_station.station_name as destination_name', 'transfers.status', 'transfers.transfer_id', 'currentstock.current_stock', 'currentstock.current_weight', 'transporters.*', 'drivers.*', 'transfers.registration', 'delivery_orders.order_number', 'delivery_orders.lot_number', 'delivery_orders.invoice_number', 'transfers.delivery_number', 'currentstock.sale_number', 'currentstock.pallet_weight', 'currentstock.package_tare', 'delivery_orders.delivery_id', 'currentstock.date_received', 'currentstock.stocked_at')
-            ->get();
+            ->get()
+            ->map(function ($item) {
+                // Sanitize all fields in each row
+                return collect($item)->map(function ($value) {
+                    return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+                });
+            });
 
         $details = $orders[0];
 
-        $prepared = UserInfo::where('user_id', $details->prepared_by)->first();
+        $prepared = UserInfo::where('user_id', $details['prepared_by'])->first();
 
         $prepare = $prepared->first_name.' '.$prepared->surname;
         $by = auth()->user()->user->surname.' '.auth()->user()->user->first_name;
@@ -3979,18 +4032,18 @@ use Modules\Clerk\Entities\WarehouseLocation;
         foreach ($orders as $key => $order){
             $table->addRow();
             $table->addCell(600, ['borderSize' => 1])->addText(++$key, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(1500, ['borderSize' => 1])->addText($order->garden_name, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(900, ['borderSize' => 1])->addText($order->grade_name, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(1000, ['borderSize' => 1])->addText($order->order_number, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(1300, ['borderSize' => 1])->addText($order->invoice_number, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(1300, ['borderSize' => 1])->addText($order->lot_number, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(1300, ['borderSize' => 1])->addText($order->sale_number, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(900, ['borderSize' => 1])->addText($order->requested_palettes, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(1300, ['borderSize' => 1])->addText($order->requested_weight, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(1300, ['borderSize' => 1])->addText(Carbon::createFromTimestamp($order->date_received)->format('d-m-Y'), $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(1500, ['borderSize' => 1])->addText($order['garden_name'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(900, ['borderSize' => 1])->addText($order['grade_name'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(1000, ['borderSize' => 1])->addText($order['order_number'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(1300, ['borderSize' => 1])->addText($order['invoice_number'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(1300, ['borderSize' => 1])->addText($order['lot_number'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(1300, ['borderSize' => 1])->addText($order['sale_number'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(900, ['borderSize' => 1])->addText($order['requested_palettes'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(1300, ['borderSize' => 1])->addText($order['requested_weight'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(1300, ['borderSize' => 1])->addText(Carbon::createFromTimestamp($order['date_received'])->format('d-m-Y'), $text, ['space' => ['before' => 100, 'after' => 100]]);
 
-            $packets += $order->requested_palettes;
-            $weight += $order->requested_weight;
+            $packets += $order['requested_palettes'];
+            $weight += $order['requested_weight'];
         }
 
         $table->addRow();
@@ -4034,13 +4087,20 @@ use Modules\Clerk\Entities\WarehouseLocation;
             ->leftJoin('drivers', 'drivers.driver_id', '=', 'external_transfers.driver_id')
             ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'external_transfers.warehouse_id')
             ->leftJoin('transporters', 'transporters.transporter_id', '=', 'external_transfers.transporter_id')
-            ->select('currentstock.client_name', 'currentstock.garden_name', 'currentstock.grade_name', 'currentstock.current_stock', 'currentstock.current_weight', 'currentstock.package', 'currentstock.station_id', 'external_transfers.driver_id', 'external_transfers.registration', 'external_transfers.warehouse_id', 'external_transfers.ex_transfer_id', 'external_transfers.status as extStatus', 'external_transfers.transferred_palettes', 'external_transfers.transferred_weight', 'transporters.transporter_name', 'transporters.transporter_id', 'drivers.driver_name', 'drivers.id_number', 'drivers.phone', 'warehouses.warehouse_name', 'external_transfers.created_at as sortOrder', 'currentstock.invoice_number', 'external_transfers.delivery_number', 'external_transfers.created_by', 'currentstock.date_received', 'currentstock.order_number', 'currentstock.lot_number', 'currentstock.sale_number', 'currentstock.stocked_at')
+            ->select('currentstock.client_name', 'currentstock.garden_name', 'currentstock.grade_name', 'currentstock.current_stock', 'currentstock.current_weight', 'currentstock.package', 'currentstock.station_id', 'external_transfers.driver_id', 'external_transfers.registration', 'external_transfers.warehouse_id', 'external_transfers.ex_transfer_id', 'external_transfers.status as extStatus', 'external_transfers.transferred_palettes', 'external_transfers.transferred_weight', 'transporters.transporter_name', 'transporters.transporter_id', 'drivers.driver_name', 'drivers.id_number', 'drivers.phone', 'warehouses.warehouse_name as destination_name', 'external_transfers.created_at as sortOrder', 'currentstock.invoice_number', 'external_transfers.delivery_number', 'external_transfers.created_by', 'currentstock.date_received', 'currentstock.order_number', 'currentstock.lot_number', 'currentstock.sale_number', 'currentstock.stocked_at')
             ->where('external_transfers.delivery_number', base64_decode($id))
             ->orderBy('extStatus', 'asc')
             ->orderBy('sortOrder', 'desc')
-            ->get();
+            ->get()
+            ->map(function ($item) {
+                // Sanitize all fields in each row
+                return collect($item)->map(function ($value) {
+                    return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+                });
+            });
+
         $details = $orders[0];
-        $prepared = UserInfo::where('user_id', $details->created_by)->first();
+        $prepared = UserInfo::where('user_id', $details['created_by'])->first();
         $user = $prepared->first_name.' '.$prepared->surname;
         $printed = auth()->user()->user;
         $by = $printed->first_name.' '.$printed->surname;
@@ -4068,19 +4128,20 @@ use Modules\Clerk\Entities\WarehouseLocation;
         foreach ($orders as $key => $order){
             $table->addRow();
             $table->addCell(600, ['borderSize' => 1])->addText(++$key, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(1500, ['borderSize' => 1])->addText($order->garden_name, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(900, ['borderSize' => 1])->addText($order->grade_name, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(1300, ['borderSize' => 1])->addText($order->order_number, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(1300, ['borderSize' => 1])->addText($order->invoice_number, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(1100, ['borderSize' => 1])->addText($order->lot_number, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(1200, ['borderSize' => 1])->addText($order->sale_number, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(900, ['borderSize' => 1])->addText($order->transferred_palettes, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(1300, ['borderSize' => 1])->addText($order->transferred_weight, $text, ['space' => ['before' => 100, 'after' => 100]]);
-            $table->addCell(1300, ['borderSize' => 1])->addText(Carbon::createFromTimestamp($order->date_received)->format('d-m-Y'), $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(1500, ['borderSize' => 1])->addText($order['garden_name'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(900, ['borderSize' => 1])->addText($order['grade_name'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(1300, ['borderSize' => 1])->addText($order['order_number'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(1300, ['borderSize' => 1])->addText($order['invoice_number'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(1100, ['borderSize' => 1])->addText($order['lot_number'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(1200, ['borderSize' => 1])->addText($order['sale_number'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(900, ['borderSize' => 1])->addText($order['transferred_palettes'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(1300, ['borderSize' => 1])->addText($order['transferred_weight'], $text, ['space' => ['before' => 100, 'after' => 100]]);
+            $table->addCell(1300, ['borderSize' => 1])->addText(Carbon::createFromTimestamp($order['date_received'])->format('d-m-Y'), $text, ['space' => ['before' => 100, 'after' => 100]]);
 
-            $packets += $order->transferred_palettes;
-            $weight += $order->transferred_weight;
+            $packets += $order['transferred_palettes'];
+            $weight += $order['transferred_weight'];
         }
+        
         $table->addRow();
         $table->addCell('7900', ['gridSpan' => 7])->addText();
         $table->addCell('900', ['gridSpan' => 1, 'borderSize' => 1])->addText($packets, $header, ['space' => ['before' => 100, 'after' => 100]]);
@@ -4098,7 +4159,7 @@ use Modules\Clerk\Entities\WarehouseLocation;
         $localli->setValue('idNo', $details['id_number']);
         $localli->setValue('phone', $details['phone']);
         $localli->setValue('by', $by);
-        $localli->setValue('warehouse', $orders[0]['warehouse_name']);
+        $localli->setValue('warehouse', $orders[0]['destination_name']);
         $localli->setValue('prepared', $user);
         $localli->setValue('from', $details['stocked_at']);
         $docPath = 'Files/TempFiles/'.base64_decode($id). '.docx';
@@ -4201,7 +4262,7 @@ use Modules\Clerk\Entities\WarehouseLocation;
     }
     public function downloadOutturReport($id)
     {
-        $blendSheet = BlendSheet::join('destinations', 'destinations.destination_id', '=', 'blend_sheets.destination_id')
+        $sheet = BlendSheet::join('destinations', 'destinations.destination_id', '=', 'blend_sheets.destination_id')
             ->join('blend_teas', 'blend_teas.blend_id', '=', 'blend_sheets.blend_id')
             ->select('blend_date', 'vessel_name', 'consignee', 'standard_details', 'port_name', 'blend_number', 'b_dust', 'c_dust', 'fibre', 'sweepings')
             ->where('blend_sheets.blend_id', $id)
@@ -4210,6 +4271,10 @@ use Modules\Clerk\Entities\WarehouseLocation;
             ->groupBy('blend_date', 'vessel_name', 'consignee', 'standard_details', 'port_name', 'blend_number', 'b_dust', 'c_dust', 'fibre', 'sweepings')
             ->whereNull('blend_teas.deleted_at')
             ->first();
+        $blendSheet = collect($sheet)->map(function ($value) {
+                return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+            });
+
         $blendSummaries = BlendShipment::where('blend_id', $id)->get();
         $blendBalances = BlendBalance::where('blend_id', $id)->get();
         $totalShipped = 0;
@@ -4234,28 +4299,28 @@ use Modules\Clerk\Entities\WarehouseLocation;
 
         $table->addRow();
         $table->addCell(5000, ['gridSpan' => 2, 'borderSize' => 1])->addText('BLEND DATE', $header, ['space' => ['before' => 100, 'after' => 50]]);
-        $table->addCell(6000, ['gridSpan' => 3, 'borderSize' => 1])->addText($blendSheet->blend_date, $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+        $table->addCell(6000, ['gridSpan' => 3, 'borderSize' => 1])->addText($blendSheet['blend_date'], $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
 
         $table->addRow();
         $table->addCell(5000, ['gridSpan' => 2, 'borderSize' => 1])->addText('SHIPPER', $header, ['space' => ['before' => 100, 'after' => 50]]);
-        $table->addCell(6000, ['gridSpan' => 3, 'borderSize' => 1])->addText($blendSheet->vessel_name, $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+        $table->addCell(6000, ['gridSpan' => 3, 'borderSize' => 1])->addText($blendSheet['vessel_name'], $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
 
         $table->addRow();
         $table->addCell(5000, ['gridSpan' => 2, 'borderSize' => 1])->addText('CONSIGNEE', $header, ['space' => ['before' => 100, 'after' => 50]]);
-        $table->addCell(6000, ['gridSpan' => 3, 'borderSize' => 1])->addText($blendSheet->consignee, $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+        $table->addCell(6000, ['gridSpan' => 3, 'borderSize' => 1])->addText($blendSheet['consignee'], $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
 
         $table->addRow();
         $table->addCell(5000, ['gridSpan' => 2, 'borderSize' => 1])->addText('SI/BLEND NUMBER', $header, ['space' => ['before' => 100, 'after' => 50]]);
-        $table->addCell(6000, ['gridSpan' => 3, 'borderSize' => 1])->addText($blendSheet->blend_number, $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+        $table->addCell(6000, ['gridSpan' => 3, 'borderSize' => 1])->addText($blendSheet['blend_number'], $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
 
         $table->addRow();
         $table->addCell(5000, ['gridSpan' => 2, 'borderSize' => 1])->addText('DESTINATION', $header, ['space' => ['before' => 100, 'after' => 50]]);
-        $table->addCell(6000, ['gridSpan' => 3, 'borderSize' => 1])->addText($blendSheet->port_name, $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+        $table->addCell(6000, ['gridSpan' => 3, 'borderSize' => 1])->addText($blendSheet['port_name'], $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
 
-        if ($blendSheet->standard_details !== null){
+        if ($blendSheet['standard_details'] !== null){
             $table->addRow();
             $table->addCell(5000, ['gridSpan' => 2, 'borderSize' => 1])->addText('STANDARD DETAILS', $header, ['space' => ['before' => 100, 'after' => 50]]);
-            $table->addCell(6000, ['gridSpan' => 3, 'borderSize' => 1])->addText($blendSheet->standard_details, $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+            $table->addCell(6000, ['gridSpan' => 3, 'borderSize' => 1])->addText($blendSheet['standard_details'], $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
         }
 
         $table->addRow();
@@ -4269,9 +4334,9 @@ use Modules\Clerk\Entities\WarehouseLocation;
 
         $table->addRow();
         $table->addCell(5000, ['gridSpan' => 2, 'borderSize' => 1])->addText('TOTAL BLEND INPUT', $header, ['space' => ['before' => 100, 'after' => 50]]);
-        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText($blendSheet->input_packages, $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
-        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format(floatval($blendSheet->input_weight) / floatval($blendSheet->input_packages), 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
-        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet->input_weight, 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText($blendSheet['input_packages'], $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format(floatval($blendSheet['input_weight']) / floatval($blendSheet['input_packages']), 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet['input_weight'], 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
 
         foreach ($blendSummaries as $key => $summary){
             $table->addRow();
@@ -4302,30 +4367,30 @@ use Modules\Clerk\Entities\WarehouseLocation;
         $table->addRow();
         $table->addCell(5000, ['gridSpan' => 2, 'borderSize' => 1])->addText('SIEVED DUST ', $header, ['space' => ['before' => 100, 'after' => 50]]);
         $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(1, $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
-        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet->b_dust, 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
-        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet->b_dust, 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet['b_dust'], 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet['b_dust'], 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
         $table->addRow();
         $table->addCell(5000, ['gridSpan' => 2, 'borderSize' => 1])->addText('CYCLONE/DUST ', $header, ['space' => ['before' => 100, 'after' => 50]]);
         $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(1, $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
-        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet->c_dust, 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
-        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet->c_dust, 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet['c_dust'], 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet['c_dust'], 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
         $table->addRow();
         $table->addCell(5000, ['gridSpan' => 2, 'borderSize' => 1])->addText('FIBRE ', $header, ['space' => ['before' => 100, 'after' => 50]]);
         $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(1, $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
-        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet->fibre, 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
-        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet->fibre, 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet['fibre'], 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet['fibre'], 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
         $table->addRow();
         $table->addCell(5000, ['gridSpan' => 2, 'borderSize' => 1])->addText('SWEEPINGS ', $header, ['space' => ['before' => 100, 'after' => 50]]);
         $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(1, $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
-        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet->sweepings, 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
-        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet->sweepings, 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
-        $totalOutput =  floatval($totalRemnant) + floatval($totalShipped) + floatval($blendSheet->sweepings) + floatval($blendSheet->fibre) + floatval($blendSheet->c_dust) + floatval($blendSheet->b_dust) + floatval($variance);
+        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet['sweepings'], 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($blendSheet['sweepings'], 2), $text, ['align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+        $totalOutput =  floatval($totalRemnant) + floatval($totalShipped) + floatval($blendSheet['sweepings']) + floatval($blendSheet['fibre']) + floatval($blendSheet['c_dust']) + floatval($blendSheet['b_dust']) + floatval($variance);
         $table->addRow();
         $table->addCell(5000, ['gridSpan' => 4, 'borderSize' => 1])->addText('TOTAL BLEND OUTPUT ', $header, ['space' => ['before' => 100, 'after' => 50]]);
         $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($totalOutput, 2), $header, ['bold' => true, 'align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
         $table->addRow();
         $table->addCell(5000, ['gridSpan' => 4, 'borderSize' => 1])->addText('BLEND GAIN/LOSS', $header, ['space' => ['before' => 100, 'after' => 50]]);
-        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($totalOutput - $blendSheet->input_weight, 2), $header, ['bold' => true, 'align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
+        $table->addCell(2000, ['gridSpan' => 1, 'borderSize' => 1])->addText(number_format($totalOutput - $blendSheet['input_weight'], 2), $header, ['bold' => true, 'align' => 'center' ,'space' => ['before' => 100, 'after' => 50]]);
         $table->addRow();
         $table->addCell(10000, ['gridSpan' => 5])->addText('NEW MATERIALS ISSUED', $header, ['size' => 12, 'align' => 'center', 'space' => ['before' => 150, 'after' => 150]]);
         $table->addRow();
@@ -4391,14 +4456,14 @@ use Modules\Clerk\Entities\WarehouseLocation;
         $localli->setComplexBlock('table', $table);
         $localli->setValue('date', date('D, d/m/y h:i:s'));
         $localli->setValue('by', auth()->user()->user->first_name.' '.auth()->user()->user->surname);
-        $docPath = 'Files/TempFiles/'.str_replace(['.', '/', ''], '', $blendSheet->blend_number). '.docx';
+        $docPath = 'Files/TempFiles/'.str_replace(['.', '/', ''], '', $blendSheet['blend_number']). '.docx';
         $localli->saveAs($docPath);
 //         return response()->download($docPath)->deleteFileAfterSend(true);
         $phpWord = IOFactory::load($docPath);
         $contents = \PhpOffice\PhpWord\IOFactory::load($docPath);
-        $pdfPath = 'Files/TempFiles/'.str_replace(['.', '/', ''], '', $blendSheet->blend_number). ".pdf";
+        $pdfPath = 'Files/TempFiles/'.str_replace(['.', '/', ''], '', $blendSheet['blend_number']). ".pdf";
         $converter =  new OfficeConverter($docPath, 'Files/TempFiles/');
-        $converter->convertTo(str_replace(['.', '/', ''], '', $blendSheet->blend_number). ".pdf");
+        $converter->convertTo(str_replace(['.', '/', ''], '', $blendSheet['blend_number']). ".pdf");
         unlink($docPath);
         return response()->download($pdfPath)->deleteFileAfterSend();
 
@@ -4511,7 +4576,12 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $blendBalances->where('blend_date', '<=', $request->to);
         }
 
-        $balances = $blendBalances->get();
+        $balances = $blendBalances->get()->map(function ($item) {
+            // Sanitize all fields in each row
+            return collect($item)->map(function ($value) {
+                return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+            });
+        });
 
         $date = date('D, d-m-Y, h:i:s');
         $printed = auth()->user()->user;
@@ -4541,16 +4611,16 @@ use Modules\Clerk\Entities\WarehouseLocation;
         foreach ($balances as $key => $stock){
             $table->addRow();
             $table->addCell(600, ['borderSize' => 1])->addText(++$key, $text, ['space' => ['before' => 50]]);
-            $table->addCell(1800, ['borderSize' => 1])->addText($stock->blend_number, $text, ['space' => ['before' => 50]]);
-            $table->addCell(2000, ['borderSize' => 1])->addText($stock->client_name, $text, ['space' => ['before' => 50]]);
-            $table->addCell(1800, ['borderSize' => 1])->addText($stock->garden, $text, ['space' => ['before' => 50]]);
-            $table->addCell(1800, ['borderSize' => 1])->addText($stock->grade, $text, ['space' => ['before' => 50]]);
-            $table->addCell(1200, ['borderSize' => 1])->addText(number_format($stock->current_packages, 2), $text, ['space' => ['before' => 50]]);
-            $table->addCell(1200, ['borderSize' => 1])->addText(number_format($stock->current_weight, 2), $text, ['space' => ['before' => 50]]);
-            $table->addCell(2000, ['borderSize' => 1])->addText($stock->blend_date, $text, ['space' => ['before' => 50]]);
-            $table->addCell(1800, ['borderSize' => 1])->addText($stock->station_name, $text, ['space' => ['before' => 50]]);
-            $totalPackets += $stock->current_packages;
-            $totalWeight += $stock->current_weight;
+            $table->addCell(1800, ['borderSize' => 1])->addText($stock['blend_number'], $text, ['space' => ['before' => 50]]);
+            $table->addCell(2000, ['borderSize' => 1])->addText($stock['client_name'], $text, ['space' => ['before' => 50]]);
+            $table->addCell(1800, ['borderSize' => 1])->addText($stock['garden'], $text, ['space' => ['before' => 50]]);
+            $table->addCell(1800, ['borderSize' => 1])->addText($stock['grade'], $text, ['space' => ['before' => 50]]);
+            $table->addCell(1200, ['borderSize' => 1])->addText(number_format($stock['current_packages'], 2), $text, ['space' => ['before' => 50]]);
+            $table->addCell(1200, ['borderSize' => 1])->addText(number_format($stock['current_weight'], 2), $text, ['space' => ['before' => 50]]);
+            $table->addCell(2000, ['borderSize' => 1])->addText($stock['blend_date'], $text, ['space' => ['before' => 50]]);
+            $table->addCell(1800, ['borderSize' => 1])->addText($stock['station_name'], $text, ['space' => ['before' => 50]]);
+            $totalPackets += $stock['current_packages'];
+            $totalWeight += $stock['current_weight'];
         }
 
         $table->addRow();
@@ -4926,12 +4996,11 @@ use Modules\Clerk\Entities\WarehouseLocation;
         $this->logger->create();
         return redirect()->back()->with('success', 'Success! Report request has been approved');
     }
+   
     public function downloadReportRequest ($id)
     {
-       $request = ReportRequest::find($id);
-        $image = $request->service_number.'.png';
-        ini_set('memory_limit', '10000M');
-        ini_set('max_execution_time', 30000);
+        $request = ReportRequest::find($id);
+        $image = $request->service_number.'_'.time().'.png';
 
         //   return strtotime($request->date_to);
 
@@ -4939,6 +5008,7 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $data = DB::table('currentstock')
                 ->where('current_stock', '>', 0)
                 ->where('current_weight', '>', 0)
+                ->where(['client_id' => $request->client_id])
                 ->orderBy('garden_name', 'asc');
 
             if ($request->request_number !== null){
@@ -4953,11 +5023,13 @@ use Modules\Clerk\Entities\WarehouseLocation;
                 $data->where('stock_date', '<=', $request->date_to);
             }
 
-            if ($request->client_id !== null){
-                $data->where('client_id', $request->client_id);
-            }
+            $reports = $data->get()->map(function ($item) {
+                // Sanitize all fields in each row
+                return collect($item)->map(function ($value) {
+                    return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+                });
+            });
 
-            $reports = $data->get()->groupBy('client_name');
 
             $date = date('D, d-m-Y, h:i:s');
             $printed = auth()->user()->user;
@@ -4977,11 +5049,6 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $text = ['size' => 7, 'name' => 'New Times Roman', 'bold' => false, 'space' => ['after' => 40, 'before' => 100]];
 
             $table = new Table(['unit' => \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT, 'width' => 100 * 50, 'align' => Jc::CENTER]);
-            foreach($reports as $clientName => $results){
-
-            $table->addRow();
-            $table->addCell(null, ['gridSpan' => 12])->addText($clientName.'\'s ACCOUNT', $headers, ['space' => ['before' => 100]]);
-
             $table->addRow();
             $table->addCell(500, ['borderSize' => 1])->addText('#', $headers, ['space' => ['before' => 100]]);
             $table->addCell(1100, ['borderSize' => 1])->addText('Garden', $headers, ['space' => ['before' => 100]]);
@@ -5003,27 +5070,26 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $totalPackets = 0;
             $totalWeight = 0;
             $grossWeight = 0;
-            foreach ($results as $key => $stock){
-
+            foreach ($reports as $key => $stock){
                 $table->addRow();
                 $table->addCell(500, ['borderSize' => 1])->addText(++$key, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1100, ['borderSize' => 1])->addText($stock->garden_name, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1000, ['borderSize' => 1])->addText($stock->invoice_number, $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
-                $table->addCell(750, ['borderSize' => 1])->addText($stock->grade_name, $text, ['space' => ['before' => 100]]);
-                $table->addCell(800, ['borderSize' => 1])->addText($stock->sale_number, $text, ['space' => ['before' => 100]]);
-                $table->addCell(800, ['borderSize' => 1])->addText($stock->lot_number, $text, ['space' => ['before' => 100]]);
+                $table->addCell(1100, ['borderSize' => 1])->addText($stock['garden_name'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText($stock['invoice_number'], $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
+                $table->addCell(750, ['borderSize' => 1])->addText($stock['grade_name'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(800, ['borderSize' => 1])->addText($stock['sale_number'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(800, ['borderSize' => 1])->addText($stock['lot_number'], $text, ['space' => ['before' => 100]]);
 
-                $table->addCell(1000, ['borderSize' => 1])->addText(number_format($stock->current_stock, 2), $text, ['space' => ['before' => 100]]);
-                $table->addCell(1200, ['borderSize' => 1])->addText(number_format($stock->current_weight, 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText(number_format($stock['current_stock'], 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(1200, ['borderSize' => 1])->addText(number_format($stock['current_weight'], 2), $text, ['space' => ['before' => 100]]);
 
-                $table->addCell(900, ['borderSize' => 1])->addText($stock->loading_number, $text, ['space' => ['before' => 100]]);
-                $table->addCell(900, ['borderSize' => 1])->addText($stock->order_number, $text, ['space' => ['before' => 100]]);
+                $table->addCell(900, ['borderSize' => 1])->addText($stock['loading_number'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(900, ['borderSize' => 1])->addText($stock['order_number'], $text, ['space' => ['before' => 100]]);
 
-                $table->addCell(900, ['borderSize' => 1])->addText(\Carbon\Carbon::createFromTimestamp($stock->date_received)->format('d-m-y'), $text, ['space' => ['before' => 100]]);
-                $table->addCell(2000, ['borderSize' => 1])->addText($stock->warehouse_name, $text, ['space' => ['before' => 100]]);
-                $totalPackets += $stock->current_stock;
-                $totalWeight += $stock->current_weight;
-                $grossWeight += floatval($stock->current_weight + ($stock->package_tare * $stock->current_stock + $stock->pallet_weight));
+                $table->addCell(900, ['borderSize' => 1])->addText(\Carbon\Carbon::createFromTimestamp($stock['date_received'])->format('d-m-y'), $text, ['space' => ['before' => 100]]);
+                $table->addCell(2000, ['borderSize' => 1])->addText($stock['warehouse_name'], $text, ['space' => ['before' => 100]]);
+                $totalPackets += $stock['current_stock'];
+                $totalWeight += $stock['current_weight'];
+                $grossWeight += floatval($stock['current_weight'] + ($stock['package_tare'] * $stock['current_stock'] + $stock['pallet_weight']));
             }
 
             $table->addRow();
@@ -5032,15 +5098,14 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $table->addCell(1200, ['borderSize' => 1])->addText(number_format($totalWeight, 2), $headers, ['space' => ['before' => 100]]);
 //              $table->addCell(1200, ['borderSize' => 1])->addText(number_format($grossWeight, 2), $headers, ['space' => ['before' => 100]]);
             $table->addCell(4700, ['gridSpan' => 4])->addText();
-        }
 
-            if ($request->approved_by !== null){
-                $approved = UserInfo::find($request->approved_by);
+            if ($request['approved_by'] !== null){
+                $approved = UserInfo::find($request['approved_by']);
                 \QrCode::size(300)
                     ->format('png')
-                    ->generate('REQUEST NUMBER: ' . $request->service_number . "\n" .
+                    ->generate('REQUEST NUMBER: ' . $request['service_number'] . "\n" .
                         'REPORT TYPE: ' . 'CURRENT STOCK POSITION' . "\n" .
-                        'CLIENT NAME: ' . 'ALL CLIENTS' . "\n" .
+                        'CLIENT NAME: ' . $reports[0]['client_name'] . "\n" .
                         'REPORTING: ' . $period . "\n" .
                         'TOTAL PACKAGES: ' . number_format($totalPackets, 2). "\n" .
                         'TOTAL NET WEIGHT: ' . number_format($totalWeight, 2). "\n" .
@@ -5050,7 +5115,7 @@ use Modules\Clerk\Entities\WarehouseLocation;
 
             $stock = new TemplateProcessor(storage_path('verified_stock_template.docx'));
             $stock->setComplexBlock('{table}', $table);
-            if ($request->approved_by !== null) {
+            if ($request['approved_by'] !== null) {
                 $stock->setImageValue('qr', array('path' => 'Files/QrCodes/' . $image, 'width' => 100, 'height' => 100, 'ratio' => true));
             }else{
                 $stock->setValue('qr','NOT APPROVED');
@@ -5058,7 +5123,8 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $stock->setValue('date', $date);
             $stock->setValue('by', $by);
             $stock->setValue('period', $period);
-            $docPath = 'Files/TempFiles/REPORT '.$request->service_number.'.docx';
+            $stock->setValue('client_name', $reports[0]['client_name']);
+            $docPath = 'Files/TempFiles/REPORT '.$request['service_number'].'.docx';
             $stock->saveAs($docPath);
 
             if (file_exists('Files/QrCodes/' . $image)){
@@ -5068,17 +5134,17 @@ use Modules\Clerk\Entities\WarehouseLocation;
 //              return response()->download($docPath)->deleteFileAfterSend(true);
             $phpWord = IOFactory::load($docPath);
             $contents = \PhpOffice\PhpWord\IOFactory::load($docPath);
-            $pdfPath = 'Files/TempFiles/REPORT '.$request->service_number. ".pdf";
+            $pdfPath = 'Files/TempFiles/REPORT '.$request['service_number']. ".pdf";
             $converter =  new OfficeConverter($docPath, 'Files/TempFiles/');
-            $converter->convertTo('REPORT '.$request->service_number.".pdf");
+            $converter->convertTo('REPORT '.$request['service_number'].".pdf");
             unlink($docPath);
             return response()->download($pdfPath)->deleteFileAfterSend(true);
 
         }elseif ($request->request_type == 2){
-
             $data = DB::table('blendBalances')
                 ->where('current_packages', '>', 0)
                 ->where('current_weight', '>', 0)
+                ->where(['client_id' => $request->client_id])
                 ->orderBy('garden', 'asc');
 
             if ($request->request_number !== null){
@@ -5093,11 +5159,12 @@ use Modules\Clerk\Entities\WarehouseLocation;
                 $data->where('blend_date', '<=', $request->date_to);
             }
 
-            if ($request->client_id !== null){
-                $data->where('client_id', $request->client_id);
-            }
-
-            $reports = $data->get()->groupBy('client_name');
+           $reports = $data->get()->map(function ($item) {
+            // Sanitize all fields in each row
+            return collect($item)->map(function ($value) {
+                return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+            });
+        });
 
             $date = date('D, d-m-Y, h:i:s');
             $printed = auth()->user()->user;
@@ -5117,10 +5184,6 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $text = ['size' => 7, 'name' => 'New Times Roman', 'bold' => false, 'space' => ['after' => 40, 'before' => 100]];
 
             $table = new Table(['unit' => \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT, 'width' => 100 * 50, 'align' => Jc::CENTER]);
-            foreach($reports as $clientName => $results){
-            $table->addRow();
-            $table->addCell(600, ['gridSpan' => 7])->addText($clientName.'\'s ACCOUNT', $headers, ['space' => ['before' => 100]]);
-
             $table->addRow();
             $table->addCell(600, ['borderSize' => 1])->addText('#', $headers, ['space' => ['before' => 100]]);
             $table->addCell(1200, ['borderSize' => 1])->addText('Blend Number', $headers, ['space' => ['before' => 100]]);
@@ -5133,18 +5196,18 @@ use Modules\Clerk\Entities\WarehouseLocation;
 
             $totalPackets = 0;
             $totalWeight = 0;
-            foreach ($results as $key => $stock){
+            foreach ($reports as $key => $stock){
                 $table->addRow();
                 $table->addCell(600, ['borderSize' => 1])->addText(++$key, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1500, ['borderSize' => 1])->addText($stock->blend_number, $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
-                $table->addCell(1500, ['borderSize' => 1])->addText($stock->garden, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1000, ['borderSize' => 1])->addText($stock->grade, $text, ['space' => ['before' => 100]]);
+                $table->addCell(1500, ['borderSize' => 1])->addText($stock['blend_number'], $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
+                $table->addCell(1500, ['borderSize' => 1])->addText($stock['garden'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText($stock['grade'], $text, ['space' => ['before' => 100]]);
 
-                $table->addCell(1200, ['borderSize' => 1])->addText(number_format($stock->current_packages, 2), $text, ['space' => ['before' => 100]]);
-                $table->addCell(1200, ['borderSize' => 1])->addText(number_format($stock->current_weight, 2), $text, ['space' => ['before' => 100]]);
-                $table->addCell(2000, ['borderSize' => 1])->addText($stock->blend_date, $text, ['space' => ['before' => 100]]);
-                $totalPackets += $stock->current_packages;
-                $totalWeight += $stock->current_weight;
+                $table->addCell(1200, ['borderSize' => 1])->addText(number_format($stock['current_packages'], 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(1200, ['borderSize' => 1])->addText(number_format($stock['current_weight'], 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(2000, ['borderSize' => 1])->addText($stock['blend_date'], $text, ['space' => ['before' => 100]]);
+                $totalPackets += $stock['current_packages'];
+                $totalWeight += $stock['current_weight'];
             }
 
             $table->addRow();
@@ -5153,15 +5216,13 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $table->addCell(1200, ['borderSize' => 1])->addText(number_format($totalWeight, 2), $headers, ['space' => ['before' => 100]]);
             $table->addCell(1200, ['gridSpan' => 1])->addText();
 
-        }
-
-            if ($request->approved_by !== null){
-                $approved = UserInfo::find($request->approved_by);
+            if ($request['approved_by'] !== null){
+                $approved = UserInfo::find($request['approved_by']);
                 \QrCode::size(300)
                     ->format('png')
-                    ->generate('REQUEST NUMBER: ' . $request->service_number . "\n" .
+                    ->generate('REQUEST NUMBER: ' . $request['service_number'] . "\n" .
                         'REPORT TYPE: ' . 'CURRENT BLEND BALANCES POSITION' . "\n" .
-                        'CLIENT NAME: ' . 'ALL CLIENTS' . "\n" .
+                        'CLIENT NAME: ' . $reports[0]['client_name'] . "\n" .
                         'REPORTING: ' . $period . "\n" .
                         'TOTAL PACKAGES: ' . number_format($totalPackets, 2). "\n" .
                         'TOTAL NET WEIGHT: ' . number_format($totalWeight, 2). "\n" .
@@ -5171,7 +5232,7 @@ use Modules\Clerk\Entities\WarehouseLocation;
 
             $stock = new TemplateProcessor(storage_path('verified_blend_balance_template.docx'));
             $stock->setComplexBlock('{table}', $table);
-            if ($request->approved_by !== null) {
+            if ($request['approved_by'] !== null) {
                 $stock->setImageValue('qr', array('path' => 'Files/QrCodes/' . $image, 'width' => 100, 'height' => 100, 'ratio' => true));
             }else{
                 $stock->setValue('qr','NOT APPROVED');
@@ -5179,8 +5240,8 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $stock->setValue('date', $date);
             $stock->setValue('by', $by);
             $stock->setValue('period', $period);
-            $stock->setValue('client_name', null);
-            $docPath = 'Files/TempFiles/REPORT '.$request->service_number.'.docx';
+            $stock->setValue('client_name', $reports[0]['client_name']);
+            $docPath = 'Files/TempFiles/REPORT '.$request['service_number'].'.docx';
             $stock->saveAs($docPath);
 
             if (file_exists('Files/QrCodes/' . $image)){
@@ -5189,9 +5250,9 @@ use Modules\Clerk\Entities\WarehouseLocation;
 //              return response()->download($docPath)->deleteFileAfterSend(true);
             $phpWord = IOFactory::load($docPath);
             $contents = \PhpOffice\PhpWord\IOFactory::load($docPath);
-            $pdfPath = 'Files/TempFiles/REPORT '.$request->service_number. ".pdf";
+            $pdfPath = 'Files/TempFiles/REPORT '.$request['service_number']. ".pdf";
             $converter =  new OfficeConverter($docPath, 'Files/TempFiles/');
-            $converter->convertTo('REPORT '.$request->service_number.".pdf");
+            $converter->convertTo('REPORT '.$request['service_number'].".pdf");
             unlink($docPath);
             return response()->download($pdfPath)->deleteFileAfterSend(true);
 
@@ -5204,6 +5265,7 @@ use Modules\Clerk\Entities\WarehouseLocation;
                 ->selectRaw('SUM(shipments.shipped_packages) as packagesShipped')
                 ->selectRaw('SUM(shipments.shipped_weight) as weightShipped')
                 ->groupBy('shipping_number', 'consignee', 'vessel_name', 'client_name', 'shipping_mark', 'container_number', 'ship_date', 'agent_name', 'port_name')
+                ->where(['shipping_instructions.client_id' => $request->client_id])
                 ->orderBy('shipping_number', 'asc');
 
             if ($request->request_number !== null){
@@ -5218,11 +5280,13 @@ use Modules\Clerk\Entities\WarehouseLocation;
                 $data->where('ship_date', '<=', strtotime($request->date_to));
             }
 
-            if ($request->client_id !== null){
-                $data->where('client_id', $request->client_id);
-            }
+            $reports = $data->get()->map(function ($item) {
+                // Sanitize all fields in each row
+                return collect($item)->map(function ($value) {
+                    return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+                });
+            });
 
-            $reports = $data->get()->groupBy('client_name');
 
             $date = date('D, d-m-Y, h:i:s');
             $printed = auth()->user()->user;
@@ -5242,10 +5306,6 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $text = ['size' => 7, 'name' => 'New Times Roman', 'bold' => false, 'space' => ['after' => 40, 'before' => 100]];
 
             $table = new Table(['unit' => \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT, 'width' => 100 * 50, 'align' => Jc::CENTER]);
-            foreach($reports as $clientName => $results){
-                $table->addRow();
-                $table->addCell(null, ['gridSpan' => 11])->addText($clientName.'\'s ACCOUNT', $headers, ['space' => ['before' => 100]]);
-
             $table->addRow();
             $table->addCell(500, ['borderSize' => 1])->addText('#', $headers, ['space' => ['before' => 100]]);
             $table->addCell(900, ['borderSize' => 1])->addText('SI Number', $headers, ['space' => ['before' => 100]]);
@@ -5261,22 +5321,22 @@ use Modules\Clerk\Entities\WarehouseLocation;
 
             $totalPackets = 0;
             $totalWeight = 0;
-            foreach ($results as $key => $stock){
+            foreach ($reports as $key => $stock){
                 $table->addRow();
                 $table->addCell(500, ['borderSize' => 1])->addText(++$key, $text, ['space' => ['before' => 100]]);
-                $table->addCell(900, ['borderSize' => 1])->addText($stock->shipping_number, $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
-                $table->addCell(1500, ['borderSize' => 1])->addText($stock->agent_name, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1000, ['borderSize' => 1])->addText($stock->port_name, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1500, ['borderSize' => 1])->addText($stock->consignee, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1200, ['borderSize' => 1])->addText($stock->vessel_name, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1200, ['borderSize' => 1])->addText($stock->shipping_mark, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1000, ['borderSize' => 1])->addText($stock->container_number, $text, ['space' => ['before' => 100]]);
+                $table->addCell(900, ['borderSize' => 1])->addText($stock['shipping_number'], $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
+                $table->addCell(1500, ['borderSize' => 1])->addText($stock['agent_name'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText($stock['port_name'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1500, ['borderSize' => 1])->addText($stock['consignee'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1200, ['borderSize' => 1])->addText($stock['vessel_name'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1200, ['borderSize' => 1])->addText($stock['shipping_mark'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText($stock['container_number'], $text, ['space' => ['before' => 100]]);
 
-                $table->addCell(900, ['borderSize' => 1])->addText(number_format($stock->packagesShipped, 2), $text, ['space' => ['before' => 100]]);
-                $table->addCell(1100, ['borderSize' => 1])->addText(number_format($stock->weightShipped, 2), $text, ['space' => ['before' => 100]]);
-                $table->addCell(950, ['borderSize' => 1])->addText($stock->ship_date == null ? 'Pending' : Carbon::createFromTimestamp($stock->ship_date)->format('Y-m-d'), $text, ['space' => ['before' => 100]]);
-                $totalPackets += $stock->packagesShipped;
-                $totalWeight += $stock->weightShipped;
+                $table->addCell(900, ['borderSize' => 1])->addText(number_format($stock['packagesShipped'], 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(1100, ['borderSize' => 1])->addText(number_format($stock['weightShipped'], 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(950, ['borderSize' => 1])->addText($stock['ship_date'] == null ? 'Pending' : Carbon::createFromTimestamp($stock['ship_date'])->format('Y-m-d'), $text, ['space' => ['before' => 100]]);
+                $totalPackets += $stock['packagesShipped'];
+                $totalWeight += $stock['weightShipped'];
             }
 
             $table->addRow();
@@ -5284,15 +5344,14 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $table->addCell(900, ['borderSize' => 1])->addText(number_format($totalPackets, 2), $headers, ['space' => ['before' => 100]]);
             $table->addCell(1100, ['borderSize' => 1])->addText(number_format($totalWeight, 2), $headers, ['space' => ['before' => 100]]);
             $table->addCell(950, ['gridSpan' => 1])->addText();
-        }
 
-            if ($request->approved_by !== null){
-                $approved = UserInfo::find($request->approved_by);
+            if ($request['approved_by'] !== null){
+                $approved = UserInfo::find($request['approved_by']);
                 \QrCode::size(300)
                     ->format('png')
                     ->generate('REQUEST NUMBER: ' . $request->service_number . "\n" .
                         'REPORT TYPE: ' . 'STRAIGHT LINE REPORT' . "\n" .
-                        'CLIENT NAME: ' . 'ALL CLIENTS '. "\n" .
+                        'CLIENT NAME: ' . $reports[0]['client_name'] . "\n" .
                         'REPORTING: ' . $period . "\n" .
                         'TOTAL PACKAGES: ' . number_format($totalPackets, 2). "\n" .
                         'TOTAL NET WEIGHT: ' . number_format($totalWeight, 2). "\n" .
@@ -5302,7 +5361,7 @@ use Modules\Clerk\Entities\WarehouseLocation;
 
             $stock = new TemplateProcessor(storage_path('verified_shipping_instructions_template.docx'));
             $stock->setComplexBlock('{table}', $table);
-            if ($request->approved_by !== null) {
+            if ($request['approved_by'] !== null) {
                 $stock->setImageValue('qr', array('path' => 'Files/QrCodes/' . $image, 'width' => 100, 'height' => 100, 'ratio' => true));
             }else{
                 $stock->setValue('qr','NOT APPROVED');
@@ -5310,8 +5369,8 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $stock->setValue('date', $date);
             $stock->setValue('by', $by);
             $stock->setValue('period', $period);
-            $stock->setValue('client_name', null);
-            $docPath = 'Files/TempFiles/REPORT '.$request->service_number.'.docx';
+            $stock->setValue('client_name', $reports[0]['client_name']);
+            $docPath = 'Files/TempFiles/REPORT '.$request['service_number'].'.docx';
             $stock->saveAs($docPath);
 
             if (file_exists('Files/QrCodes/' . $image)){
@@ -5320,9 +5379,9 @@ use Modules\Clerk\Entities\WarehouseLocation;
 //              return response()->download($docPath)->deleteFileAfterSend(true);
             $phpWord = IOFactory::load($docPath);
             $contents = \PhpOffice\PhpWord\IOFactory::load($docPath);
-            $pdfPath = 'Files/TempFiles/REPORT '.$request->service_number. ".pdf";
+            $pdfPath = 'Files/TempFiles/REPORT '.$request['service_number']. ".pdf";
             $converter =  new OfficeConverter($docPath, 'Files/TempFiles/');
-            $converter->convertTo('REPORT '.$request->service_number.".pdf");
+            $converter->convertTo('REPORT '.$request['service_number'].".pdf");
             unlink($docPath);
             return response()->download($pdfPath)->deleteFileAfterSend(true);
 
@@ -5335,7 +5394,7 @@ use Modules\Clerk\Entities\WarehouseLocation;
                 ->selectRaw('SUM(blend_teas.blended_packages) as blendedPackages')
                 ->selectRaw('SUM(blend_teas.blended_weight) as blendedWeight')
                 ->groupBy('client_name', 'port_name', 'agent_name', 'blend_number', 'consignee', 'shipping_mark', 'vessel_name', 'garden', 'blend_shipped')
-                // ->where(['blend_sheets.client_id' => $request->client_id])
+                ->where(['blend_sheets.client_id' => $request->client_id])
                 ->orderBy('blend_number', 'asc');
 
             if ($request->request_number !== null){
@@ -5350,11 +5409,12 @@ use Modules\Clerk\Entities\WarehouseLocation;
                 $data->where('blend_shipped', '<=', strtotime($request->date_to));
             }
 
-            if ($request->client_id !== null){
-                $data->where('client_id', $request->client_id);
-            }
-
-            $reports = $data->get()->groupBy('client_name');
+           $reports = $data->get()->map(function ($item) {
+            // Sanitize all fields in each row
+            return collect($item)->map(function ($value) {
+                return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+            });
+        });
 
             $date = date('D, d-m-Y, h:i:s');
             $printed = auth()->user()->user;
@@ -5374,12 +5434,6 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $text = ['size' => 7, 'name' => 'New Times Roman', 'bold' => false, 'space' => ['after' => 40, 'before' => 100]];
 
             $table = new Table(['unit' => \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT, 'width' => 100 * 50, 'align' => Jc::CENTER]);
-
-            foreach($reports as $clientName => $results){
-
-            $table->addRow();
-            $table->addCell(null, ['gridSpan' => 11])->addText($clientName. '\'s ACCOUNT', $headers, ['space' => ['before' => 100]]);
-
             $table->addRow();
             $table->addCell(500, ['borderSize' => 1])->addText('#', $headers, ['space' => ['before' => 100]]);
             $table->addCell(900, ['borderSize' => 1])->addText('SI Number', $headers, ['space' => ['before' => 100]]);
@@ -5395,22 +5449,23 @@ use Modules\Clerk\Entities\WarehouseLocation;
 
             $totalPackets = 0;
             $totalWeight = 0;
-            foreach ($results as $key => $stock){
+            foreach ($reports as $key => $stock){
                 $table->addRow();
                 $table->addCell(500, ['borderSize' => 1])->addText(++$key, $text, ['space' => ['before' => 100]]);
-                $table->addCell(900, ['borderSize' => 1])->addText($stock->blend_number, $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
-                $table->addCell(1100, ['borderSize' => 1])->addText($stock->garden, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1500, ['borderSize' => 1])->addText($stock->agent_name, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1000, ['borderSize' => 1])->addText($stock->port_name, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1500, ['borderSize' => 1])->addText($stock->consignee, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1200, ['borderSize' => 1])->addText($stock->vessel_name, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1000, ['borderSize' => 1])->addText($stock->shipping_mark, $text, ['space' => ['before' => 100]]);
+                $table->addCell(900, ['borderSize' => 1])->addText($stock['blend_number'], $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
+                $table->addCell(1100, ['borderSize' => 1])->addText($stock['garden'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1500, ['borderSize' => 1])->addText($stock['agent_name'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText($stock['port_name'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1500, ['borderSize' => 1])->addText($stock['consignee'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1200, ['borderSize' => 1])->addText($stock['vessel_name'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText($stock['shipping_mark'], $text, ['space' => ['before' => 100]]);
 
-                $table->addCell(900, ['borderSize' => 1])->addText(number_format($stock->blendedPackages, 2), $text, ['space' => ['before' => 100]]);
-                $table->addCell(1100, ['borderSize' => 1])->addText(number_format($stock->blendedWeight, 2), $text, ['space' => ['before' => 100]]);
-                $table->addCell(950, ['borderSize' => 1])->addText($stock->blend_shipped == null ? 'Pending' : Carbon::createFromTimestamp($stock->blend_shipped)->format('Y-m-d'), $text, ['space' => ['before' => 100]]);
-                $totalPackets += $stock->blendedPackages;
-                $totalWeight += $stock->blendedWeight;
+                $table->addCell(900, ['borderSize' => 1])->addText(number_format($stock['blendedPackages'], 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(1100, ['borderSize' => 1])->addText(number_format($stock['blendedWeight'], 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(950, ['borderSize' => 1])->addText($stock['blend_shipped'] == null ? 'Pending' : Carbon::createFromTimestamp($stock['blend_shipped'])->format('Y-m-d'), $text, ['space' => ['before' => 100]]);
+                
+                $totalPackets += $stock['blendedPackages'];
+                $totalWeight += $stock['blendedWeight'];
             }
 
             $table->addRow();
@@ -5418,15 +5473,14 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $table->addCell(900, ['borderSize' => 1])->addText(number_format($totalPackets, 2), $headers, ['space' => ['before' => 100]]);
             $table->addCell(1100, ['borderSize' => 1])->addText(number_format($totalWeight, 2), $headers, ['space' => ['before' => 100]]);
             $table->addCell(950, ['gridSpan' => 1])->addText();
-        }
 
-            if ($request->approved_by !== null){
-                $approved = UserInfo::find($request->approved_by);
+            if ($request['approved_by'] !== null){
+                $approved = UserInfo::find($request['approved_by']);
                 \QrCode::size(300)
                     ->format('png')
-                    ->generate('REQUEST NUMBER: ' . $request->service_number . "\n" .
+                    ->generate('REQUEST NUMBER: ' . $request['service_number'] . "\n" .
                         'REPORT TYPE: ' . 'BLEND REPORT' . "\n" .
-                        'CLIENT NAME: ' . 'ALL CLIENTS' . "\n" .
+                        'CLIENT NAME: ' . $reports[0]['client_name'] . "\n" .
                         'REPORTING: ' . $period . "\n" .
                         'TOTAL PACKAGES: ' . number_format($totalPackets, 2). "\n" .
                         'TOTAL NET WEIGHT: ' . number_format($totalWeight, 2). "\n" .
@@ -5436,7 +5490,7 @@ use Modules\Clerk\Entities\WarehouseLocation;
 
             $stock = new TemplateProcessor(storage_path('verified_blend_sheets_template.docx'));
             $stock->setComplexBlock('{table}', $table);
-            if ($request->approved_by !== null) {
+            if ($request['approved_by'] !== null) {
                 $stock->setImageValue('qr', array('path' => 'Files/QrCodes/' . $image, 'width' => 100, 'height' => 100, 'ratio' => true));
             }else{
                 $stock->setValue('qr','NOT APPROVED');
@@ -5444,8 +5498,8 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $stock->setValue('date', $date);
             $stock->setValue('by', $by);
             $stock->setValue('period', $period);
-            $stock->setValue('client_name', null);
-            $docPath = 'Files/TempFiles/REPORT '.$request->service_number.'.docx';
+            $stock->setValue('client_name', $reports[0]['client_name']);
+            $docPath = 'Files/TempFiles/REPORT '.$request['service_number'].'.docx';
             $stock->saveAs($docPath);
 
             if (file_exists('Files/QrCodes/' . $image)){
@@ -5454,21 +5508,20 @@ use Modules\Clerk\Entities\WarehouseLocation;
 //              return response()->download($docPath)->deleteFileAfterSend(true);
             $phpWord = IOFactory::load($docPath);
             $contents = \PhpOffice\PhpWord\IOFactory::load($docPath);
-            $pdfPath = 'Files/TempFiles/REPORT '.$request->service_number. ".pdf";
+            $pdfPath = 'Files/TempFiles/REPORT '.$request['service_number']. ".pdf";
             $converter =  new OfficeConverter($docPath, 'Files/TempFiles/');
-            $converter->convertTo('REPORT '.$request->service_number.".pdf");
+            $converter->convertTo('REPORT '.$request['service_number'].".pdf");
             unlink($docPath);
             return response()->download($pdfPath)->deleteFileAfterSend(true);
 
         }elseif ($request->request_type == 5){
-
             $data = ExternalTransfer::join('delivery_orders', 'delivery_orders.delivery_id', '=', 'external_transfers.delivery_id')
                 ->join('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
                 ->join('warehouses', 'warehouses.warehouse_id', '=', 'external_transfers.warehouse_id')
                 ->join('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
                 ->join('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
                 ->select('client_name', 'warehouse_name', 'garden_name', 'grade_name', 'invoice_number', 'lot_number', 'order_number', 'delivery_number', 'transferred_palettes', 'transferred_weight', 'external_transfers.updated_at')
-                // ->where(['delivery_orders.client_id' => $request->client_id])
+                ->where(['delivery_orders.client_id' => $request->client_id])
                 ->orderBy('garden_name', 'asc');
 
             if ($request->request_number !== null){
@@ -5483,11 +5536,13 @@ use Modules\Clerk\Entities\WarehouseLocation;
                 $data->where('external_transfers.created_at', '<=', $request->date_to);
             }
 
-            if ($request->client_id !== null){
-                $data->where('client_id', $request->client_id);
-            }
-
-            $reports = $data->get()->groupBy('client_name');
+            $reports = $data->get()->map(function ($item) {
+                    // Sanitize all fields in each row
+                    return collect($item)->map(function ($value) {
+                        return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+                    });
+                });
+;
 
             $date = date('D, d-m-Y, h:i:s');
             $printed = auth()->user()->user;
@@ -5507,10 +5562,6 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $text = ['size' => 7, 'name' => 'New Times Roman', 'bold' => false, 'space' => ['after' => 40, 'before' => 100]];
 
             $table = new Table(['unit' => \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT, 'width' => 100 * 50, 'align' => Jc::CENTER]);
-            foreach($reports as $clientName => $results){
-            $table->addRow();
-            $table->addCell(null, ['gridSpan' => 11])->addText($clientName. '\'s ACCOUNT', $headers, ['space' => ['before' => 100]]);
-
             $table->addRow();
             $table->addCell(500, ['borderSize' => 1])->addText('#', $headers, ['space' => ['before' => 100]]);
             $table->addCell(1200, ['borderSize' => 1])->addText('Delivery Number', $headers, ['space' => ['before' => 100]]);
@@ -5526,22 +5577,22 @@ use Modules\Clerk\Entities\WarehouseLocation;
 
             $totalPackets = 0;
             $totalWeight = 0;
-            foreach ($results as $key => $stock){
+            foreach ($reports as $key => $stock){
                 $table->addRow();
                 $table->addCell(500, ['borderSize' => 1])->addText(++$key, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1200, ['borderSize' => 1])->addText($stock->delivery_number, $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
-                $table->addCell(1200, ['borderSize' => 1])->addText($stock->order_number, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1100, ['borderSize' => 1])->addText($stock->invoice_number, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1300, ['borderSize' => 1])->addText($stock->garden_name, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1000, ['borderSize' => 1])->addText($stock->grade_name, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1000, ['borderSize' => 1])->addText($stock->lot_number, $text, ['space' => ['before' => 100]]);
+                $table->addCell(1200, ['borderSize' => 1])->addText($stock['delivery_number'], $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
+                $table->addCell(1200, ['borderSize' => 1])->addText($stock['order_number'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1100, ['borderSize' => 1])->addText($stock['invoice_number'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1300, ['borderSize' => 1])->addText($stock['garden_name'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText($stock['grade_name'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText($stock['lot_number'], $text, ['space' => ['before' => 100]]);
 
-                $table->addCell(900, ['borderSize' => 1])->addText(number_format($stock->transferred_palettes, 2), $text, ['space' => ['before' => 100]]);
-                $table->addCell(1100, ['borderSize' => 1])->addText(number_format($stock->transferred_weight, 2), $text, ['space' => ['before' => 100]]);
-                $table->addCell(1500, ['borderSize' => 1])->addText($stock->warehouse_name, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1000, ['borderSize' => 1])->addText($stock->updated_at == null ? 'Pending' : Carbon::parse($stock->updated_at)->format('Y-m-d'), $text, ['space' => ['before' => 100]]);
-                $totalPackets += $stock->transferred_palettes;
-                $totalWeight += $stock->transferred_weight;
+                $table->addCell(900, ['borderSize' => 1])->addText(number_format($stock['transferred_palettes'], 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(1100, ['borderSize' => 1])->addText(number_format($stock['transferred_weight'], 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(1500, ['borderSize' => 1])->addText($stock['warehouse_name'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText($stock['updated_at'] == null ? 'Pending' : Carbon::parse($stock['updated_at'])->format('Y-m-d'), $text, ['space' => ['before' => 100]]);
+                $totalPackets += $stock['transferred_palettes'];
+                $totalWeight += $stock['transferred_weight'];
             }
 
             $table->addRow();
@@ -5549,15 +5600,14 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $table->addCell(900, ['borderSize' => 1])->addText(number_format($totalPackets, 2), $headers, ['space' => ['before' => 100]]);
             $table->addCell(1100, ['borderSize' => 1])->addText(number_format($totalWeight, 2), $headers, ['space' => ['before' => 100]]);
             $table->addCell(2250, ['gridSpan' => 2])->addText();
-        }
 
-            if ($request->approved_by !== null){
-                $approved = UserInfo::find($request->approved_by);
+            if ($request['approved_by'] !== null){
+                $approved = UserInfo::find($request['approved_by']);
                 \QrCode::size(300)
                     ->format('png')
-                    ->generate('REQUEST NUMBER: ' . $request->service_number . "\n" .
+                    ->generate('REQUEST NUMBER: ' . $request['service_number'] . "\n" .
                         'REPORT TYPE: ' . 'EXTERNAL TRANSFERS REPORT' . "\n" .
-                        'CLIENT NAME: ' . 'ALL CLIENTS '. "\n" .
+                        'CLIENT NAME: ' . $reports[0]['client_name'] . "\n" .
                         'REPORTING: ' . $period . "\n" .
                         'TOTAL PACKAGES: ' . number_format($totalPackets, 2). "\n" .
                         'TOTAL NET WEIGHT: ' . number_format($totalWeight, 2). "\n" .
@@ -5567,7 +5617,7 @@ use Modules\Clerk\Entities\WarehouseLocation;
 
             $stock = new TemplateProcessor(storage_path('verified_external_transfers_template.docx'));
             $stock->setComplexBlock('{table}', $table);
-            if ($request->approved_by !== null) {
+            if ($request['approved_by'] !== null) {
                 $stock->setImageValue('qr', array('path' => 'Files/QrCodes/' . $image, 'width' => 100, 'height' => 100, 'ratio' => true));
             }else{
                 $stock->setValue('qr','NOT APPROVED');
@@ -5575,8 +5625,8 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $stock->setValue('date', $date);
             $stock->setValue('by', $by);
             $stock->setValue('period', $period);
-            $stock->setValue('client_name', null);
-            $docPath = 'Files/TempFiles/REPORT '.$request->service_number.'.docx';
+            $stock->setValue('client_name', $reports[0]['client_name']);
+            $docPath = 'Files/TempFiles/REPORT '.$request['service_number'].'.docx';
             $stock->saveAs($docPath);
 
             if (file_exists('Files/QrCodes/' . $image)){
@@ -5585,20 +5635,18 @@ use Modules\Clerk\Entities\WarehouseLocation;
 //              return response()->download($docPath)->deleteFileAfterSend(true);
             $phpWord = IOFactory::load($docPath);
             $contents = \PhpOffice\PhpWord\IOFactory::load($docPath);
-            $pdfPath = 'Files/TempFiles/REPORT '.$request->service_number. ".pdf";
+            $pdfPath = 'Files/TempFiles/REPORT '.$request['service_number']. ".pdf";
             $converter =  new OfficeConverter($docPath, 'Files/TempFiles/');
-            $converter->convertTo('REPORT '.$request->service_number.".pdf");
+            $converter->convertTo('REPORT '.$request['service_number'].".pdf");
             unlink($docPath);
             return response()->download($pdfPath)->deleteFileAfterSend(true);
-
         }elseif ($request->request_type == 6){
-
             $data = DeliveryOrder::join('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
-                ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'delivery_orders.warehouse_id')
+                ->join('warehouses', 'warehouses.warehouse_id', '=', 'delivery_orders.warehouse_id')
                 ->join('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
                 ->join('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
-                ->select('client_name', 'sale_number', 'warehouse_name', 'garden_name', 'grade_name', 'delivery_orders.delivery_type','invoice_number', 'lot_number', 'order_number', 'packet', 'weight', 'delivery_orders.status', 'delivery_orders.created_at')
-                // ->where(['delivery_orders.client_id' => $request->client_id])
+                ->select('client_name', 'sale_number', 'warehouse_name', 'garden_name', 'grade_name', 'delivery_orders.delivery_type','invoice_number', 'lot_number', 'order_number', 'packet', 'weight', 'delivery_orders.status')
+                ->where(['delivery_orders.client_id' => $request->client_id])
                 ->orderBy('garden_name', 'asc');
 
             if ($request->request_number !== null){
@@ -5613,12 +5661,12 @@ use Modules\Clerk\Entities\WarehouseLocation;
                 $data->where('delivery_orders.created_at', '<=', $request->date_to);
             }
 
-            if ($request->client_id !== null){
-                $data->where('delivery_orders.client_id', $request->client_id);
-            }
-
-           $reports = $data->get()->groupBy('client_name');
-
+           $reports = $data->get()->map(function ($item) {
+            // Sanitize all fields in each row
+            return collect($item)->map(function ($value) {
+                return is_string($value) ? htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8') : $value;
+            });
+        });
 
             $date = date('D, d-m-Y, h:i:s');
             $printed = auth()->user()->user;
@@ -5630,7 +5678,6 @@ use Modules\Clerk\Entities\WarehouseLocation;
                 $period = 'FOR PERIOD BETWEEN '.$request->date_from.' AND '.$request->date_to;
             }
 
-
             $domPdfPath = base_path('vendor/dompdf/dompdf');
             \PhpOffice\PhpWord\Settings::setPdfRendererPath($domPdfPath);
             \PhpOffice\PhpWord\Settings::setPdfRendererName('DomPDF');
@@ -5639,18 +5686,6 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $text = ['size' => 7, 'name' => 'New Times Roman', 'bold' => false, 'space' => ['after' => 40, 'before' => 100]];
 
             $table = new Table(['unit' => \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT, 'width' => 100 * 50, 'align' => Jc::CENTER]);
-
-            $summaryTotalWeight = 0;
-            $summaryTotalPackages = 0;
-
-            foreach($reports as $clientName => $results){
-
-            $totalPackets = 0;
-            $totalWeight = 0;
-
-            $table->addRow();
-            $table->addCell(null, ['borderSize' => 1, 'gridSpan' => 12])->addText('CLIENT NAME '. $clientName, $headers, ['space' => ['before' => 100]]);
-
             $table->addRow();
             $table->addCell(500, ['borderSize' => 1])->addText('#', $headers, ['space' => ['before' => 100]]);
             $table->addCell(900, ['borderSize' => 1])->addText('Del. Type', $headers, ['space' => ['before' => 100]]);
@@ -5665,29 +5700,26 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $table->addCell(1800, ['borderSize' => 1])->addText('Producer Whs', $headers, ['space' => ['before' => 100]]);
             $table->addCell(1000, ['borderSize' => 1])->addText('Collection Status', $headers, ['space' => ['before' => 100]]);
 
-
-            foreach ($results as $key => $stock){
+            $totalPackets = 0;
+            $totalWeight = 0;
+            foreach ($reports as $key => $stock){
                 $table->addRow();
                 $table->addCell(500, ['borderSize' => 1])->addText(++$key, $text, ['space' => ['before' => 100]]);
-                $table->addCell(900, ['borderSize' => 1])->addText($stock->delivery_type == 1 ? 'DO Entry' : 'Direct Del', $text, ['space' => ['before' => 100]]);
-                $table->addCell(1000, ['borderSize' => 1])->addText($stock->invoice_number, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1100, ['borderSize' => 1])->addText($stock->garden_name, $text, ['space' => ['before' => 100]]);
-                $table->addCell(900, ['borderSize' => 1])->addText($stock->grade_name, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1000, ['borderSize' => 1])->addText($stock->order_number, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1000, ['borderSize' => 1])->addText($stock->lot_number, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1000, ['borderSize' => 1])->addText($stock->sale_number, $text, ['space' => ['before' => 100]]);
+                $table->addCell(900, ['borderSize' => 1])->addText($stock['delivery_type'] == 1 ? 'DO Entry' : 'Direct Del', $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText($stock['invoice_number'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1100, ['borderSize' => 1])->addText($stock['garden_name'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(900, ['borderSize' => 1])->addText($stock['grade_name'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText($stock['order_number'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText($stock['lot_number'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText($stock['sale_number'], $text, ['space' => ['before' => 100]]);
 
-                $table->addCell(900, ['borderSize' => 1])->addText(number_format($stock->packet, 2), $text, ['space' => ['before' => 100]]);
-                $table->addCell(1100, ['borderSize' => 1])->addText(number_format($stock->weight, 2), $text, ['space' => ['before' => 100]]);
-                $table->addCell(2000, ['borderSize' => 1])->addText($stock->warehouse_name, $text, ['space' => ['before' => 100]]);
-                $table->addCell(1100, ['borderSize' => 1])->addText($stock->status == null || $stock->status == 1 ? 'Under Collection' : 'Collected', $text, ['space' => ['before' => 100]]);
-                $totalPackets += $stock->packet;
-                $totalWeight += $stock->weight;
+                $table->addCell(900, ['borderSize' => 1])->addText(number_format($stock['packet'], 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(1100, ['borderSize' => 1])->addText(number_format($stock['weight'], 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(2000, ['borderSize' => 1])->addText($stock['warehouse_name'], $text, ['space' => ['before' => 100]]);
+                $table->addCell(1100, ['borderSize' => 1])->addText($stock['status'] == null || $stock['status'] == 1 ? 'Under Collection' : 'Collected', $text, ['space' => ['before' => 100]]);
+                $totalPackets += $stock['packet'];
+                $totalWeight += $stock['weight'];
             }
-
-            $summaryTotalWeight += $totalWeight;
-            $summaryTotalPackages += $totalPackets;
-
 
             $table->addRow();
             $table->addCell(7300, ['gridSpan' => 8])->addText();
@@ -5695,48 +5727,44 @@ use Modules\Clerk\Entities\WarehouseLocation;
             $table->addCell(1100, ['borderSize' => 1])->addText(number_format($totalWeight, 2), $headers, ['space' => ['before' => 100]]);
             $table->addCell(3100, ['gridSpan' => 2])->addText();
 
-            $table->addRow();
-            $table->addCell(null, ['gridSpan' => 12])->addText('', $headers, ['space' => ['before' => 100]]);
-
+            if ($request['approved_by'] !== null){
+                $approved = UserInfo::find($request['approved_by']);
+                \QrCode::size(300)
+                    ->format('png')
+                    ->generate('REQUEST NUMBER: ' . $request['service_number'] . "\n" .
+                        'REPORT TYPE: ' . 'TEA ARRIVAL REPORT' . "\n" .
+                        'CLIENT NAME: ' . $reports[0]['client_name'] . "\n" .
+                        'REPORTING: ' . $period . "\n" .
+                        'TOTAL PACKAGES: ' . number_format($totalPackets, 2). "\n" .
+                        'TOTAL NET WEIGHT: ' . number_format($totalWeight, 2). "\n" .
+                        'REPORT APPROVED BY: ' . $approved->first_name.' '.$approved->surname . "\n",
+                        'Files/QrCodes/'.$image);
             }
-
-            $approved = UserInfo::find($request->approved_by);
-
-            $qrCodePath = 'Files/QrCodes/'.$request->service_number.'.png';
-            \QrCode::format('png')
-            ->size(1000)
-            ->generate('REQUEST NUMBER: ' . $request->service_number . "\n" .
-               'REPORT TYPE: ' . 'TEA ARRIVAL REPORT' . "\n" .
-               'CLIENT NAME: ' . 'ALL CLIENTS' . "\n" .
-               'REPORTING: ' . $period . "\n" .
-               'TOTAL PACKAGES: ' . number_format($summaryTotalPackages, 2) . "\n" .
-               'TOTAL NET WEIGHT: ' . number_format($summaryTotalWeight, 2) . "\n" .
-               'REPORT APPROVED BY: ' . $approved->first_name.' '.$approved->surname,
-               $qrCodePath);
 
             $stock = new TemplateProcessor(storage_path('verified_tea_collection_template.docx'));
             $stock->setComplexBlock('{table}', $table);
-
-                if ($approved) {
-                    $stock->setImageValue('qr', array('path' => $qrCodePath, 'width' => 90, 'height' => 100, 'ratio' => true, 'embed' => true));
-                } else {
-                    $stock->setValue('qr', 'NOT APPROVED'); // Fallback if QR code not generated
-                }
-
+            if ($request['approved_by'] !== null) {
+                $stock->setImageValue('qr', array('path' => 'Files/QrCodes/' . $image, 'width' => 100, 'height' => 100, 'ratio' => true));
+            }else{
+                $stock->setValue('qr','NOT APPROVED');
+            }
             $stock->setValue('date', $date);
             $stock->setValue('by', $by);
             $stock->setValue('period', $period);
-            $docPath = 'Files/TempFiles/REPORT '.$request->service_number.'.docx';
+            $stock->setValue('client_name', $reports[0]['client_name']);
+            $docPath = 'Files/TempFiles/REPORT '.$request['service_number'].'.docx';
             $stock->saveAs($docPath);
 
-            $phpWord = IOFactory::load($docPath);
-            $pdfPath = 'Files/TempFiles/REPORT '.$request->service_number. time().".pdf";
-            $converter =  new OfficeConverter($docPath, 'Files/TempFiles/');
-            $converter->convertTo('REPORT '.$request->service_number.time().".pdf");
-            unlink($docPath);
             if (file_exists('Files/QrCodes/' . $image)){
                 unlink('Files/QrCodes/' . $image);
             }
+
+            $phpWord = IOFactory::load($docPath);
+            $contents = \PhpOffice\PhpWord\IOFactory::load($docPath);
+            $pdfPath = 'Files/TempFiles/REPORT '.$request['service_number']. ".pdf";
+            $converter =  new OfficeConverter($docPath, 'Files/TempFiles/');
+            $converter->convertTo('REPORT '.$request['service_number'].".pdf");
+            unlink($docPath);
             return response()->download($pdfPath)->deleteFileAfterSend(true);
         }
     }
@@ -5752,4 +5780,300 @@ use Modules\Clerk\Entities\WarehouseLocation;
         $data = Station::whereNot('station_id', $warehouseId)->get();
         return response()->json($data);
     }
+    public function stockAgingReport()
+    {
+        $agingAnalysis = DB::table('currentstock')
+            ->select(
+                'client_id',
+                'client_name',
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) <= 30 THEN current_stock ELSE 0 END) AS stock_0_30'),
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) <= 30 THEN current_weight ELSE 0 END) AS weight_0_30'),
+
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) BETWEEN 31 AND 90 THEN current_stock ELSE 0 END) AS stock_31_90'),
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) BETWEEN 31 AND 90 THEN current_weight ELSE 0 END) AS weight_31_90'),
+
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) BETWEEN 91 AND 180 THEN current_stock ELSE 0 END) AS stock_91_180'),
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) BETWEEN 91 AND 180 THEN current_weight ELSE 0 END) AS weight_91_180'),
+
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) BETWEEN 181 AND 365 THEN current_stock ELSE 0 END) AS stock_181_365'),
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) BETWEEN 181 AND 365 THEN current_weight ELSE 0 END) AS weight_181_365'),
+
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) > 365 THEN current_stock ELSE 0 END) AS stock_more_than_1yr'),
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) > 365 THEN current_weight ELSE 0 END) AS weight_more_than_1yr'),
+
+                // Add total weight column
+                DB::raw('SUM(current_weight) AS total_weight'),
+                DB::raw('SUM(current_stock) AS total_stock')
+            )
+            ->where('current_stock', '>', 0)
+            ->groupBy('client_id', 'client_name')
+            ->orderBy('total_weight', 'desc')
+            ->get();
+
+        return view('admin::reports.agingAnalysis')->with(['clients' => $agingAnalysis]);
+    }
+
+    public function clientStock($id)
+    {
+        $agingAnalysis = DB::table('currentstock')
+            ->select(
+                'client_id',
+                'client_name',
+                'invoice_number',
+                'order_number',
+                'grade_name',
+                'garden_name',
+                DB::raw('CASE WHEN delivery_type = 1 THEN "DO ENTRY" ELSE "DIRECT DEL" END AS delivery'),
+                DB::raw('SUM(current_stock) AS current_stock'), // Sum of current_stock
+                DB::raw('SUM(current_weight) AS current_weight'), // Sum of current_weight
+                DB::raw('DATE_FORMAT(FROM_UNIXTIME(MIN(date_received)), "%Y-%m-%d") AS min_date_received'), // Minimum date_received
+                DB::raw('CASE
+                    WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(MIN(date_received))) < 30 THEN "<30"
+                    WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(MIN(date_received))) BETWEEN 31 AND 90 THEN "31-90"
+                    WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(MIN(date_received))) BETWEEN 91 AND 180 THEN "91-180"
+                    WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(MIN(date_received))) BETWEEN 181 AND 365 THEN "181-365"
+                    WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(MIN(date_received))) > 365 THEN "365+"
+                    ELSE "Unknown"
+                END AS aging_period')
+            )
+            ->where('current_stock', '>', 0)
+            ->where(['client_id' => $id])
+            ->groupBy('client_id', 'client_name', 'invoice_number', 'grade_name', 'garden_name', 'delivery_type', 'order_number') // Group by necessary fields
+            ->orderBy('min_date_received', 'desc') // Order by the minimum date_received
+            ->get();
+
+
+        return view('admin::reports.clientStock')->with(['stocks' => $agingAnalysis]);
+    }
+
+    public function downloadStockAgingReport(Request $request)
+    {
+        $agingAnalysis = DB::table('currentstock')
+            ->select(
+                'client_id',
+                'client_name',
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) <= 30 THEN current_stock ELSE 0 END) AS stock_0_30'),
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) <= 30 THEN current_weight ELSE 0 END) AS weight_0_30'),
+
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) BETWEEN 31 AND 90 THEN current_stock ELSE 0 END) AS stock_31_90'),
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) BETWEEN 31 AND 90 THEN current_weight ELSE 0 END) AS weight_31_90'),
+
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) BETWEEN 91 AND 180 THEN current_stock ELSE 0 END) AS stock_91_180'),
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) BETWEEN 91 AND 180 THEN current_weight ELSE 0 END) AS weight_91_180'),
+
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) BETWEEN 181 AND 365 THEN current_stock ELSE 0 END) AS stock_181_365'),
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) BETWEEN 181 AND 365 THEN current_weight ELSE 0 END) AS weight_181_365'),
+
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) > 365 THEN current_stock ELSE 0 END) AS stock_more_than_1yr'),
+                DB::raw('SUM(CASE WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(date_received)) > 365 THEN current_weight ELSE 0 END) AS weight_more_than_1yr'),
+
+                // Add total weight column
+                DB::raw('SUM(current_weight) AS total_weight'),
+                DB::raw('SUM(current_stock) AS total_stock')
+            )
+            ->where('current_stock', '>', 0)
+            ->groupBy('client_id', 'client_name')
+            ->orderBy('total_weight', 'desc');
+
+                if ($request->clientId !== null){
+                        $agingAnalysis->where('client_id', $request->clientId);
+                }
+
+                $stocks = $agingAnalysis->get();
+
+                if ($request->reportType == 2){
+                    return Excel::download(new ExportAgingStock($stocks), 'AGING REPORT'.' '.time().'.xlsx', \Maatwebsite\Excel\Excel::XLSX);
+                }
+
+        ini_set('memory_limit', '10000M');
+        ini_set('max_execution_time', 30000);
+
+        $date = date('D, d-m-Y, h:i:s');
+        $printed = auth()->user()->user;
+        $by = $printed->first_name.' '.$printed->surname;
+
+        $domPdfPath = base_path('vendor/dompdf/dompdf');
+        \PhpOffice\PhpWord\Settings::setPdfRendererPath($domPdfPath);
+        \PhpOffice\PhpWord\Settings::setPdfRendererName('DomPDF');
+
+        $headers = ['size' => 8, 'name' => 'New Times Roman', 'bold' => true, 'space' => ['after' => 50, 'before' => 100]];
+        $text = ['size' => 7, 'name' => 'New Times Roman', 'bold' => false, 'space' => ['after' => 40, 'before' => 100]];
+
+        $table = new Table(['unit' => \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT, 'width' => 100 * 50, 'align' => Jc::CENTER]);
+
+        $table->addRow();
+        $table->addCell(600, ['borderSize' => 1])->addText('#', $headers, ['space' => ['before' => 100]]);
+        $table->addCell(2000, ['borderSize' => 1])->addText('Client Name', $headers, ['space' => ['before' => 100]]);
+        $table->addCell(1000, ['borderSize' => 1])->addText('0-30 Days', $headers, ['space' => ['before' => 100]]);
+        $table->addCell(1000, ['borderSize' => 1])->addText('31-90 Days', $headers, ['space' => ['before' => 100]]);
+        $table->addCell(1000, ['borderSize' => 1])->addText('91-180 Days', $headers, ['space' => ['before' => 100]]);
+        $table->addCell(1000, ['borderSize' => 1])->addText('181-365 Days', $headers, ['space' => ['before' => 100]]);
+        $table->addCell(1000, ['borderSize' => 1])->addText('365+ Days', $headers, ['space' => ['before' => 100]]);
+        $table->addCell(1500, ['borderSize' => 1])->addText('Net Weight (Package)', $headers, ['space' => ['before' => 100]]);
+
+        foreach ($stocks as $key => $stock){
+            $table->addRow();
+            $table->addCell(600, ['borderSize' => 1])->addText(++$key, $text, ['space' => ['before' => 100]]);
+            $table->addCell(2000, ['borderSize' => 1])->addText($stock->client_name, $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
+            $table->addCell(1000, ['borderSize' => 1])->addText(number_format($stock->weight_0_30, 2), $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
+            $table->addCell(1000, ['borderSize' => 1])->addText(number_format($stock->weight_31_90, 2), $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
+            $table->addCell(1000, ['borderSize' => 1])->addText(number_format($stock->weight_91_180, 2), $text, ['space' => ['before' => 100]]);
+            $table->addCell(1000, ['borderSize' => 1])->addText(number_format($stock->weight_181_365, 2), $text, ['space' => ['before' => 100]]);
+            $table->addCell(1000, ['borderSize' => 1])->addText(number_format($stock->weight_more_than_1yr, 2), $text, ['space' => ['before' => 100]]);
+            $table->addCell(1500, ['borderSize' => 1])->addText(number_format($stock->total_weight, 2).' ('.number_format($stock->total_stock, 0).')', $text, ['space' => ['before' => 100]]);
+        }
+
+        $stock = new TemplateProcessor(storage_path('client_aging_stock_template.docx'));
+        $stock->setComplexBlock('{table}', $table);
+        $stock->setValue('date', $date);
+        $stock->setValue('by', $by);
+        $docPath = 'Files/TempFiles/STOCK AGING'.time().'.docx';
+        $stock->saveAs($docPath);
+
+        $phpWord = IOFactory::load($docPath);
+        $phpWord = IOFactory::load($docPath);
+        $pdfPath = 'Files/TempFiles/STOCK AGING'.time(). ".pdf";
+        $converter =  new OfficeConverter($docPath, 'Files/TempFiles/');
+        $converter->convertTo('STOCK AGING'.time().".pdf");
+        unlink($docPath);
+        return response()->download($pdfPath)->deleteFileAfterSend(true);
+
+    }
+
+    public function downloadClientStockAgingReport(Request $request, $id)
+    {
+        $agingAnalysis = DB::table('currentstock')
+            ->select(
+                'client_id',
+                'client_name',
+                'invoice_number',
+                'order_number',
+                'grade_name',
+                'garden_name',
+                DB::raw('CASE WHEN delivery_type = 1 THEN "DO ENTRY" ELSE "DIRECT DEL" END AS delivery'),
+                DB::raw('SUM(current_stock) AS current_stock'), // Sum of current_stock
+                DB::raw('SUM(current_weight) AS current_weight'), // Sum of current_weight
+                DB::raw('DATE_FORMAT(FROM_UNIXTIME(MIN(date_received)), "%Y-%m-%d") AS min_date_received'), // Minimum date_received
+                DB::raw('CASE
+                    WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(MIN(date_received))) < 30 THEN "0-30"
+                    WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(MIN(date_received))) BETWEEN 31 AND 90 THEN "31-90"
+                    WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(MIN(date_received))) BETWEEN 91 AND 180 THEN "91-180"
+                    WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(MIN(date_received))) BETWEEN 181 AND 365 THEN "181-365"
+                    WHEN DATEDIFF(CURDATE(), FROM_UNIXTIME(MIN(date_received))) > 365 THEN "365+"
+                    ELSE "Unknown"
+                END AS aging_period'),
+                'loading_number'
+            )
+            ->where('current_stock', '>', 0)
+            ->where(['client_id' => $id])
+            ->groupBy('client_id', 'client_name', 'invoice_number', 'grade_name', 'garden_name', 'delivery_type', 'order_number', 'loading_number') // Group by necessary fields
+            ->orderBy('min_date_received', 'desc'); // Order by the minimum date_received
+
+        if ($request->period !== null) {
+            $thirtyDay = Carbon::today()->subDays(30)->getTimestamp();
+            $nintyDay = Carbon::today()->subDays(90)->getTimestamp();
+            $oneEightyDay = Carbon::today()->subDays(180)->getTimestamp();
+            $threeSixFiveDay = Carbon::today()->subDays(365)->getTimestamp();
+
+            if ($request->period == 1) {
+                // <30
+                $agingAnalysis = $agingAnalysis->where('date_received', '>=', $thirtyDay);  // Records received within the last 30 days
+            } elseif ($request->period == 2) {
+                // 31-90
+                $agingAnalysis = $agingAnalysis->where('date_received', '>=', $nintyDay)
+                    ->where('date_received', '<', $thirtyDay); // Between 31 and 90 days ago
+            } elseif ($request->period == 3) {
+                // 91-180
+                $agingAnalysis = $agingAnalysis->where('date_received', '>=', $oneEightyDay)
+                    ->where('date_received', '<', $nintyDay); // Between 91 and 180 days ago
+            } elseif ($request->period == 4) {
+                // 181-365
+                $agingAnalysis = $agingAnalysis->where('date_received', '>=', $threeSixFiveDay)
+                    ->where('date_received', '<', $oneEightyDay); // Between 181 and 365 days ago
+            } else {
+                // >365
+                $agingAnalysis = $agingAnalysis;  // Records older than 365 days
+            }
+        }
+
+        $stocks = $agingAnalysis->get();
+
+        if ($request->reportType == 2){
+            return Excel::download(new ExportClientAgingStock($stocks), 'AGING REPORT'.' '.time().'.xlsx', \Maatwebsite\Excel\Excel::XLSX);
+        }
+
+        ini_set('memory_limit', '10000M');
+        ini_set('max_execution_time', 30000);
+
+        $date = date('D, d-m-Y, h:i:s');
+        $printed = auth()->user()->user;
+        $by = $printed->first_name.' '.$printed->surname;
+
+        $domPdfPath = base_path('vendor/dompdf/dompdf');
+        \PhpOffice\PhpWord\Settings::setPdfRendererPath($domPdfPath);
+        \PhpOffice\PhpWord\Settings::setPdfRendererName('DomPDF');
+
+        $headers = ['size' => 8, 'name' => 'New Times Roman', 'bold' => true, 'space' => ['after' => 50, 'before' => 100]];
+        $text = ['size' => 7, 'name' => 'New Times Roman', 'bold' => false, 'space' => ['after' => 40, 'before' => 100]];
+
+        $table = new Table(['unit' => \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT, 'width' => 100 * 50, 'align' => Jc::CENTER]);
+
+            $table->addRow();
+            $table->addCell(null, ['gridSpan' => 11])->addText('CLIENT NAME : '.$stocks[0]->client_name, $headers);
+            $table->addRow();
+            $table->addCell(600, ['borderSize' => 1])->addText('#', $headers, ['space' => ['before' => 100]]);
+            $table->addCell(1200, ['borderSize' => 1])->addText('Invoice #', $headers, ['space' => ['before' => 100]]);
+            $table->addCell(1200, ['borderSize' => 1])->addText('Delivery Type', $headers, ['space' => ['before' => 100]]);
+            $table->addCell(1300, ['borderSize' => 1])->addText('Order Number', $headers, ['space' => ['before' => 100]]);
+            $table->addCell(1500, ['borderSize' => 1])->addText('Garden Name', $headers, ['space' => ['before' => 100]]);
+            $table->addCell(1000, ['borderSize' => 1])->addText('Grade', $headers, ['space' => ['before' => 100]]);
+            $table->addCell(1000, ['borderSize' => 1])->addText('Pkgs', $headers, ['space' => ['before' => 100]]);
+            $table->addCell(1200, ['borderSize' => 1])->addText('Net Weight', $headers, ['space' => ['before' => 100]]);
+            $table->addCell(1000, ['borderSize' => 1])->addText('TCI #', $headers, ['space' => ['before' => 100]]);
+            $table->addCell(1100, ['borderSize' => 1])->addText("Date Rec'd", $headers, ['space' => ['before' => 100]]);
+            $table->addCell(1200, ['borderSize' => 1])->addText('Aging Period', $headers, ['space' => ['before' => 100]]);
+
+            $totalPackets = 0;
+            $totalWeight = 0;
+
+            foreach ($stocks as $key => $stock){
+                $table->addRow();
+                $table->addCell(600, ['borderSize' => 1])->addText(++$key, $text, ['space' => ['before' => 100]]);
+                $table->addCell(1200, ['borderSize' => 1])->addText($stock->invoice_number, $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
+                $table->addCell(1200, ['borderSize' => 1])->addText($stock->delivery, $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
+                $table->addCell(1300, ['borderSize' => 1])->addText($stock->order_number, $text, ['setNoWrap' => true, 'space' => ['before' => 100]]);
+                $table->addCell(1500, ['borderSize' => 1])->addText($stock->garden_name, $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText($stock->grade_name, $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText(number_format($stock->current_stock, 0), $text, ['space' => ['before' => 100]]);
+                $table->addCell(1200, ['borderSize' => 1])->addText(number_format($stock->current_weight, 2), $text, ['space' => ['before' => 100]]);
+                $table->addCell(1000, ['borderSize' => 1])->addText($stock->loading_number, $text, ['space' => ['before' => 100]]);
+                $table->addCell(1100, ['borderSize' => 1])->addText($stock->min_date_received, $text, ['space' => ['before' => 100]]);
+                $table->addCell(1200, ['borderSize' => 1])->addText($stock->aging_period.' Days', $text, ['space' => ['before' => 100]]);
+
+                $totalPackets += $stock->current_stock;
+                $totalWeight += $stock->current_weight;
+            }
+
+            $table->addRow();
+            $table->addCell(6550, ['gridSpan' => 6])->addText('');
+            $table->addCell(1000, ['borderSize' => 1])->addText(number_format($totalPackets, 0), $headers, ['space' => ['before' => 100]]);
+            $table->addCell(1200, ['borderSize' => 1])->addText(number_format($totalWeight, 2), $headers, ['space' => ['before' => 100]]);
+            $table->addCell(4700, ['gridSpan' => 3])->addText('');
+
+        $stock = new TemplateProcessor(storage_path('aging_stock_template.docx'));
+        $stock->setComplexBlock('{table}', $table);
+        $stock->setValue('date', $date);
+        $stock->setValue('by', $by);
+        $docPath = 'Files/TempFiles/ANGING REPORT'.time().'.docx';
+        $stock->saveAs($docPath);
+
+        $phpWord = IOFactory::load($docPath);
+        $pdfPath = 'Files/TempFiles/ANGING REPORT'.time(). ".pdf";
+        $converter =  new OfficeConverter($docPath, 'Files/TempFiles/');
+        $converter->convertTo('ANGING REPORT'.time().".pdf");
+        
+        unlink($docPath);
+        return response()->download($pdfPath)->deleteFileAfterSend(true);
+    }
+
 }

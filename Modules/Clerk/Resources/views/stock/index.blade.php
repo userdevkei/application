@@ -33,8 +33,8 @@
                                                     <label> CLIENT NAME</label>
                                                     <select class="form-select js-choice" name="client">
                                                         <option value="" selected>-- all clients --</option>
-                                                        @foreach($stocks->groupBy('client_name') as $clientName => $client)
-                                                            <option value="{{ $client[0]->client_id }}">{{ $clientName }}</option>
+                                                        @foreach($stocks->groupBy('client_id') as $clientName => $client)
+                                                            <option value="{{ $clientName }}">{{ $client[0]->client_name }}</option>
                                                         @endforeach
                                                     </select>
                                                 </div>
@@ -43,8 +43,8 @@
                                                     <label> WAREHOUSES </label>
                                                     <select class="form-select js-choice" name="station">
                                                         <option value="" selected>-- all warehouses --</option>
-                                                        @foreach($stocks->groupBy('stocked_at') as $warehouseName => $warehouse)
-                                                            <option value="{{ $warehouse[0]->station_id }}">{{ $warehouseName }}</option>
+                                                        @foreach($stocks->groupBy('station_id') as $warehouseName => $warehouse)
+                                                            <option value="{{ $warehouseName }}">{{ $warehouse[0]->stocked_at }}</option>
                                                         @endforeach
                                                     </select>
                                                 </div>

@@ -118,6 +118,11 @@
                           <div class="d-flex align-items-center"><span class="nav-link-icon"><span class="fa fa-file"></span></span><span class="nav-link-text ps-1">View Reports</span>
                           </div>
                       </a>
+
+                      <!-- parent pages--><a class="nav-link" href="{{ route('admin.stockAgingReport') }}" role="button" data-bs-toggle="" aria-expanded="false">
+                          <div class="d-flex align-items-center"><span class="nav-link-icon"><span class="fa-solid fa-hourglass-start"></span></span><span class="nav-link-text ps-1">Aging Analysis</span>
+                          </div>
+                      </a>
                   </li>
 
                   <li class="nav-item">
